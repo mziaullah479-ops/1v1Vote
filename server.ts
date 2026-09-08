@@ -100,7 +100,8 @@ async function startServer() {
       return res.json(data);
     } catch (err: any) {
       console.error('Error in /api/detect-social:', err);
-      return res.status(500).json({ error: err.message || 'Failed to detect profile' });
+      const status = err?.message === 'Only YouTube, TikTok, Instagram, and Twitch profile URLs are supported.' ? 400 : 502;
+      return res.status(status).json({ error: err.message || 'Failed to detect profile' });
     }
   });
 
@@ -117,7 +118,8 @@ async function startServer() {
       return res.json(data);
     } catch (err: any) {
       console.error('Error in /api/detect-social (POST):', err);
-      return res.status(500).json({ error: err.message || 'Failed to detect profile' });
+      const status = err?.message === 'Only YouTube, TikTok, Instagram, and Twitch profile URLs are supported.' ? 400 : 502;
+      return res.status(status).json({ error: err.message || 'Failed to detect profile' });
     }
   });
 
