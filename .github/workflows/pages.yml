@@ -1,0 +1,62 @@
+name: Build and deploy 1v1Vote preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: VITE_BASE_PATH=/1v1Vote/ npm run build
+      - name: Smoke-test backend bundle
+        run: |
+          PORT=4175 NODE_ENV=production DATA_DIR="$RUNNER_TEMP/1v1vote-data" ADMIN_PASSWORD="ci-test-password" node dist/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:4175/api/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/1v1vote-server.log"
+          exit 1
+      - name: Preserve SPA routes
+        run: cp dist/index.html dist/404.html
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
