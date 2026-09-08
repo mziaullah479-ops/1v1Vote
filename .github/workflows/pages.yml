@@ -30,17 +30,42 @@ jobs:
         run: VITE_BASE_PATH=/1v1Vote/ npm run build
       - name: Smoke-test backend bundle
         run: |
-          PORT=4175 NODE_ENV=production DATA_DIR="$RUNNER_TEMP/1v1vote-data" ADMIN_PASSWORD="ci-test-password" node dist/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
+          export PORT=4175 NODE_ENV=production DATA_DIR="$RUNNER_TEMP/1v1vote-data" ADMIN_PASSWORD="ci-test-password"
+          node dist/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
           for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:4175/api/health; then
-              exit 0
+            if curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
+              break
             fi
             sleep 1
           done
-          cat "$RUNNER_TEMP/1v1vote-server.log"
-          exit 1
+          curl --fail --silent -c "$RUNNER_TEMP/user-cookies.txt" \
+            -H 'content-type: application/json' \
+            -d '{"name":"CI Tester","email":"ci@example.com","password":"ci-test-password"}' \
+            http://127.0.0.1:4175/api/auth/register > /dev/null
+          curl --fail --silent -b "$RUNNER_TEMP/user-cookies.txt" \
+            http://127.0.0.1:4175/api/matches > "$RUNNER_TEMP/matches.json"
+          match_id=$(node -p "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP + '/matches.json')).matches[0].id")
+          creator_id=$(node -p "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP + '/matches.json')).matches[0].creator1.id")
+          curl --fail --silent -b "$RUNNER_TEMP/user-cookies.txt" \
+            -H 'content-type: application/json' \
+            -d "{\"creatorId\":\"$creator_id\"}" \
+            "http://127.0.0.1:4175/api/matches/$match_id/vote" > /dev/null
+          duplicate_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -b "$RUNNER_TEMP/user-cookies.txt" \
+            -H 'content-type: application/json' \
+            -d "{\"creatorId\":\"$creator_id\"}" \
+            "http://127.0.0.1:4175/api/matches/$match_id/vote")
+          test "$duplicate_status" = "409"
+          curl --fail --silent -c "$RUNNER_TEMP/admin-cookies.txt" \
+            -H 'content-type: application/json' \
+            -d '{"password":"ci-test-password"}' \
+            http://127.0.0.1:4175/api/admin/login > /dev/null
+          curl --fail --silent -b "$RUNNER_TEMP/admin-cookies.txt" \
+            -X POST http://127.0.0.1:4175/api/admin/backup > /dev/null
+          kill "$server_pid"
+          wait "$server_pid" || true
       - name: Preserve SPA routes
         run: cp dist/index.html dist/404.html
       - name: Configure Pages
