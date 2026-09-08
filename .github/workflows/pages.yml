@@ -33,7 +33,7 @@ jobs:
           export PORT=4175 NODE_ENV=production DATA_DIR="$RUNNER_TEMP/1v1vote-data" ADMIN_PASSWORD="ci-test-password"
           node dist/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid"' EXIT
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           for attempt in {1..20}; do
             if curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
               break
