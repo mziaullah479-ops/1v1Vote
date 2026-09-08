@@ -24,7 +24,10 @@ The admin panel is not linked from the public navigation. Open `/admin` directly
 
 ## Deployment
 
-The app runs as one Express/Vite service and listens on the hosting provider's `PORT`. Set `NODE_ENV=production`, `ADMIN_PASSWORD`, and any provider-specific secrets. The current demo data store uses browser storage; a shared production vote database should be added before launch at scale.
+The app runs as one Express/Vite service and listens on the hosting provider's `PORT`. Set `NODE_ENV=production`, `ADMIN_PASSWORD`, `DATA_DIR`, and `BACKUP_DIR`. For a host without persistent disks, also set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`; Turso stores the complete application state in one SQLite-compatible row while the JSON file remains a local mirror and backup source.
+
+The JSON store is intended for one Node instance. Turso keeps state across deploys and restarts, but this service still assumes a single application instance because it keeps an in-memory snapshot. Run `npm run backup` from a host scheduler for an additional backup cycle, and copy the backup directory to separate object storage for disaster recovery.
+
+GitHub Pages remains a static preview only. It does not run the account, voting, admin, or backup API.
 
 For container-based hosting, build with `docker build -t 1v1vote .` and run with `docker run --rm -p 3000:3000 -e NODE_ENV=production -e ADMIN_PASSWORD='use-a-private-value' 1v1vote`.
-
