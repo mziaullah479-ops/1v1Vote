@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, BarChart2, Share2, TrendingUp, Zap, Radio, Sparkles } from 'lucide-react';
+import { Clock, BarChart2, Share2, Radio } from 'lucide-react';
 import { Match, LiveVoteEvent } from '../types';
 import { MatchStore } from '../data/store';
 
 interface StockTradingChartProps {
   match: Match;
   onOpenShareModal: () => void;
-  onVote?: (creatorId: string) => void;
 }
 
 export const StockTradingChart: React.FC<StockTradingChartProps> = ({
   match,
   onOpenShareModal,
-  onVote,
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [lastSurge, setLastSurge] = useState<{ creatorName: string; deltaP: number; isUp: boolean } | null>(null);
@@ -148,14 +146,6 @@ export const StockTradingChart: React.FC<StockTradingChartProps> = ({
   const yTicks = [100, 80, 60, 50, 40, 20, 0];
   const activePoint = hoverIndex !== null ? rawPoints[hoverIndex] : null;
 
-  const handleManualQuickVote = (creatorId: string) => {
-    if (onVote) {
-      onVote(creatorId);
-    } else {
-      MatchStore.vote(match.id, creatorId);
-    }
-  };
-
   return (
     <div className="w-full max-w-6xl mx-auto my-6 px-2 sm:px-4">
       {/* ================= STATUS PILL BAR ================= */}
@@ -201,43 +191,6 @@ export const StockTradingChart: React.FC<StockTradingChartProps> = ({
 
       {/* ================= STOCK TRADING STYLE CHART CARD ================= */}
       <div className="bg-[#070e1c] rounded-3xl p-4 sm:p-7 border border-slate-800/90 shadow-[0_0_45px_rgba(0,0,0,0.6)] relative overflow-hidden">
-        {/* Top Header with Indicators & Quick Test Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
-          <div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-white text-base sm:text-lg font-black tracking-tight">
-                Live Stock-Trading Vote Chart
-              </h3>
-              <span className="bg-sky-500/20 text-sky-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-500/30 animate-pulse">
-                Dynamic Movement
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs mt-0.5">
-              ہر ایک ووٹ سے لائنیں اوپر نیچے حرکت کرتی ہیں (Every vote visibly shifts the lines)
-            </p>
-          </div>
-
-          {/* Quick Vote Simulator buttons to let users directly see the lines jump */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-slate-400 font-semibold hidden lg:inline">Test Impact:</span>
-            <button
-              onClick={() => handleManualQuickVote(match.creator1.id)}
-              className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-300 hover:text-white px-3 py-1 rounded-full text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)] active:scale-95"
-            >
-              <Zap className="w-3 h-3 text-emerald-400" />
-              <span>+1 {match.creator1.name.split(' ')[0]} (Push ▲)</span>
-            </button>
-            <button
-              onClick={() => handleManualQuickVote(match.creator2.id)}
-              className="flex items-center gap-1.5 bg-orange-950/80 hover:bg-orange-900 border border-orange-500/50 text-orange-300 hover:text-white px-3 py-1 rounded-full text-xs font-bold transition-all shadow-[0_0_12px_rgba(249,115,22,0.2)] active:scale-95"
-            >
-              <Zap className="w-3 h-3 text-orange-400" />
-              <span>+1 {match.creator2.name.split(' ')[0]} (Push ▲)</span>
-            </button>
-          </div>
-        </div>
-
         {/* Real-time Ticker Broadcast Stream */}
         <div className="mb-3 bg-[#0a1224] rounded-xl px-3.5 py-2 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2 overflow-hidden">
