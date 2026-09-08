@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Users, ThumbsUp, Check, Flame, Heart, Zap, Sparkles } from 'lucide-react';
+import { CheckCircle2, ThumbsUp, Check, Flame, Heart } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Match } from '../types';
 import { MatchStore } from '../data/store';
@@ -124,21 +124,6 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
             {r.emoji}
           </div>
         ))}
-      </div>
-
-      {/* Key Notice Banner: Every vote directly swings the lines below */}
-      <div className="mb-4 bg-gradient-to-r from-sky-950/60 via-slate-900/80 to-amber-950/60 border border-sky-500/30 rounded-2xl p-2.5 sm:px-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
-          <span>
-            <strong className="text-white">ایک ایک ووٹ بہت اہم ہے:</strong> Every single vote directly impacts the
-            live trading lines below!
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] text-sky-400 font-semibold">
-          <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-            <span>Fan reactions are counted once per account or device.</span>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 items-center">
