@@ -1,4 +1,5 @@
 import { Platform } from '../types';
+import { fetchSocialProfile } from '../utils/socialDetector';
 
 export interface UrlValidationResult {
   url: string;
@@ -19,89 +20,6 @@ export interface UrlValidationResult {
   checkedAt: string;
   summary: string;
 }
-
-// Known profile dictionary for instant, accurate pre-fetch simulation
-const KNOWN_CREATORS: Record<string, {
-  name: string;
-  platform: Platform;
-  handle: string;
-  avatar: string;
-  subscribers: string;
-  subscribersRaw: number;
-  growth: string;
-  verified: boolean;
-}> = {
-  'duckybhai': {
-    name: 'Ducky Bhai',
-    platform: 'YouTube',
-    handle: '@duckybhai',
-    avatar: 'https://yt3.googleusercontent.com/5GjGOS15zHTzzU5uEBcn3k6rZylpPj6tSpXPhu3k2IyTolRWi4puSHs1_3KqojfNQC-kENxlImk=s900-c-k-c0x00ffffff-no-rj',
-    subscribers: '10.2M',
-    subscribersRaw: 10200000,
-    growth: '+3,400 today',
-    verified: true,
-  },
-  'mrbeast': {
-    name: 'MrBeast',
-    platform: 'YouTube',
-    handle: '@MrBeast',
-    avatar: 'https://yt3.googleusercontent.com/fxGKYucJAVme-Yz4fsdCroCFCrKafoFUaf3rJpymMcOSlDgZueSsmuhqibm0mgrVmivpmvdJYw=s900-c-k-c0x00ffffff-no-rj',
-    subscribers: '315M',
-    subscribersRaw: 315000000,
-    growth: '+45,000 today',
-    verified: true,
-  },
-  'mrbeastgaming': {
-    name: 'MrBeast Gaming',
-    platform: 'YouTube',
-    handle: '@mrbeastgaming',
-    avatar: 'https://yt3.googleusercontent.com/nxYrc_1_2f77DoBadyxMTmv7ZpRZapHR5jbuYe7PlPd5cIRJxtNNEYyOC0ZsxaDyJJzXrnJiuDE=s900-c-k-c0x00ffffff-no-rj',
-    subscribers: '44.8M',
-    subscribersRaw: 44800000,
-    growth: '+4,800 today',
-    verified: true,
-  },
-  'carryminati': {
-    name: 'CarryMinati',
-    platform: 'YouTube',
-    handle: '@CarryMinati',
-    avatar: 'https://yt3.googleusercontent.com/j0j_F-vJ2q5-bK5QnL0z4rT3g1k9_8rUq8-3k4=s900-c-k-c0x00ffffff-no-rj',
-    subscribers: '44.1M',
-    subscribersRaw: 44100000,
-    growth: '+6,200 today',
-    verified: true,
-  },
-  'ishowspeed': {
-    name: 'IShowSpeed',
-    platform: 'YouTube',
-    handle: '@IShowSpeed',
-    avatar: 'https://yt3.googleusercontent.com/ieK0j0sDqI_AHDwYxZ2Wly07-R7PG4S3YMtxOWCEe1QH-I0FgimJ92tlydQa6M78YD0VaywCaw=s900-c-k-c0x00ffffff-no-rj',
-    subscribers: '35.4M',
-    subscribersRaw: 35400000,
-    growth: '+8,400 today',
-    verified: true,
-  },
-  'kaicenat': {
-    name: 'Kai Cenat',
-    platform: 'Twitch',
-    handle: '@kaicenat',
-    avatar: 'https://unavatar.io/twitch/kaicenat',
-    subscribers: '14.8M',
-    subscribersRaw: 14800000,
-    growth: '+5,200 today',
-    verified: true,
-  },
-  'pewdiepie': {
-    name: 'PewDiePie',
-    platform: 'YouTube',
-    handle: '@PewDiePie',
-    avatar: 'https://unavatar.io/youtube/pewdiepie',
-    subscribers: '111M',
-    subscribersRaw: 111000000,
-    growth: '+1,100 today',
-    verified: true,
-  },
-};
 
 /**
  * Pre-checks if an image can actually be loaded by browser.
@@ -142,8 +60,7 @@ export function checkImagePreload(imageUrl: string): Promise<boolean> {
 }
 
 /**
- * Validates a creator profile URL and performs simulated pre-fetching
- * of metadata (names, handles, avatars, subscriber counts, and connection health).
+ * Validates a creator profile URL and fetches public metadata when available.
  */
 export async function prefetchAndValidateCreatorUrl(
   inputUrl: string,
@@ -243,63 +160,40 @@ export async function prefetchAndValidateCreatorUrl(
     cleanHandle = `@${hostname.replace('www.', '').split('.')[0]}`;
   }
 
-  // Simulate network pre-fetch latency (e.g., 180ms - 320ms)
-  await new Promise((r) => setTimeout(r, 180 + Math.random() * 140));
-
-  // 3. Resolve metadata via known database or simulated resolver
-  const key = cleanHandle.replace('@', '').toLowerCase();
-  const known = KNOWN_CREATORS[key];
-
+  // Resolve metadata from the server scraper. Missing public stats remain unavailable.
+  const cleanHandleValue = cleanHandle.replace('@', '');
   let resolvedName = nameHint || '';
-  let resolvedAvatar = '';
-  let resolvedFollowers = '1.0M';
-  let resolvedRawSubs = 1000000;
-  let resolvedGrowth = '+1,500 today';
-  let verified = true;
+  let resolvedAvatar = detectedPlatform === 'Other'
+    ? ''
+    : `https://unavatar.io/${detectedPlatform.toLowerCase()}/${encodeURIComponent(cleanHandleValue)}`;
+  let resolvedFollowers = '';
+  let resolvedRawSubs = 0;
+  let resolvedGrowth = '';
+  let verified = false;
 
-  if (known) {
-    resolvedName = nameHint || known.name;
-    resolvedAvatar = known.avatar;
-    resolvedFollowers = known.subscribers;
-    resolvedRawSubs = known.subscribersRaw;
-    resolvedGrowth = known.growth;
-    verified = known.verified;
-    if (detectedPlatform === 'Other') detectedPlatform = known.platform;
-  } else {
-    // Heuristic pre-fetch fallback
+  try {
+    const metadata = await fetchSocialProfile(normalizedUrl, nameHint);
+    if (detectedPlatform === 'Other') detectedPlatform = metadata.platform;
+    cleanHandle = metadata.handle || cleanHandle;
+    resolvedName = metadata.name || resolvedName || cleanHandle.replace('@', '');
+    resolvedAvatar = metadata.avatarUrl || resolvedAvatar;
+    resolvedFollowers = metadata.followersCount || '';
+    resolvedRawSubs = typeof metadata.subscriberCountRaw === 'number' ? metadata.subscriberCountRaw : 0;
+    resolvedGrowth = metadata.growthRate || '';
+    verified = metadata.verified === true;
+  } catch (error) {
+    console.warn('Could not fetch public social metadata:', error);
     const rawName = nameHint || cleanHandle.replace('@', '');
     resolvedName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-
-    if (detectedPlatform === 'YouTube') {
-      resolvedAvatar = `https://unavatar.io/youtube/${encodeURIComponent(cleanHandle)}`;
-      resolvedFollowers = '2.4M';
-      resolvedRawSubs = 2400000;
-    } else if (detectedPlatform === 'Twitch') {
-      resolvedAvatar = `https://unavatar.io/twitch/${encodeURIComponent(cleanHandle.replace('@', ''))}`;
-      resolvedFollowers = '850K';
-      resolvedRawSubs = 850000;
-    } else if (detectedPlatform === 'TikTok') {
-      resolvedAvatar = `https://unavatar.io/tiktok/${encodeURIComponent(cleanHandle.replace('@', ''))}`;
-      resolvedFollowers = '1.8M';
-      resolvedRawSubs = 1800000;
-    } else if (detectedPlatform === 'Instagram') {
-      resolvedAvatar = `https://unavatar.io/instagram/${encodeURIComponent(cleanHandle.replace('@', ''))}`;
-      resolvedFollowers = '1.2M';
-      resolvedRawSubs = 1200000;
-    } else {
-      resolvedAvatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(resolvedName)}`;
-      resolvedFollowers = '500K';
-      resolvedRawSubs = 500000;
-    }
   }
 
   // 4. Pre-check image validity asynchronously
   let imageStatus: 'valid' | 'broken' | 'loading' = 'valid';
   try {
     const isImageAccessible = await checkImagePreload(resolvedAvatar);
-    imageStatus = isImageAccessible ? 'valid' : 'valid'; // Fallback works safely
+    imageStatus = isImageAccessible ? 'valid' : 'broken';
   } catch {
-    imageStatus = 'valid';
+    imageStatus = 'broken';
   }
 
   const latencyMs = Math.round(performance.now() - startTime);
@@ -307,7 +201,7 @@ export async function prefetchAndValidateCreatorUrl(
   return {
     url: trimmed,
     isValidUrl: true,
-    status: 'verified',
+    status: 'valid',
     platform: detectedPlatform,
     creatorName: resolvedName,
     handle: cleanHandle,
@@ -320,7 +214,7 @@ export async function prefetchAndValidateCreatorUrl(
     latencyMs,
     imageStatus,
     checkedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    summary: `${detectedPlatform} channel detected: ${cleanHandle} • Avatar & metadata verified`,
+    summary: `${detectedPlatform} profile detected: ${cleanHandle} • Public stats shown only when available`,
   };
 }
 
