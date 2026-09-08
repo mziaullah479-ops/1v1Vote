@@ -121,4 +121,3 @@ export async function fetchSocialProfile(
 
   return syncFallback;
 }
-
