@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://1v1vote.com/sitemap.xml
