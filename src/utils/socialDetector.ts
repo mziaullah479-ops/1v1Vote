@@ -14,7 +14,8 @@ export interface DetectedSocialProfile {
 }
 
 /**
- * Fast synchronous parser to determine platform, clean handle, and default unavatar URL
+ * Fast synchronous parser to determine platform, clean handle, and default avatar URL.
+ * Counts stay empty until the server returns publicly available metadata.
  */
 export function detectSocialProfile(url: string, creatorNameHint?: string): DetectedSocialProfile {
   const cleanUrl = url.trim();
@@ -73,11 +74,11 @@ export function detectSocialProfile(url: string, creatorNameHint?: string): Dete
     name: formattedName,
     avatarUrl: defaultAvatar,
     channelLogoUrl: defaultAvatar,
-    followersCount: '1.0M',
-    subscriberCountRaw: 1000000,
-    growthRate: '+1,200 today',
+    followersCount: '',
+    subscriberCountRaw: 0,
+    growthRate: '',
     profileUrl: cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`,
-    verified: true,
+    verified: false,
   };
 }
 
@@ -108,11 +109,11 @@ export async function fetchSocialProfile(
         name: data.name || syncFallback.name,
         avatarUrl: data.avatarUrl,
         channelLogoUrl: data.avatarUrl,
-        followersCount: data.followersCount || syncFallback.followersCount,
-        subscriberCountRaw: data.subscriberCountRaw || syncFallback.subscriberCountRaw,
-        growthRate: data.growthRate || syncFallback.growthRate,
-        profileUrl: data.profileUrl || syncFallback.profileUrl,
-        verified: data.verified ?? true,
+         followersCount: data.followersCount ?? syncFallback.followersCount,
+         subscriberCountRaw: typeof data.subscriberCountRaw === 'number' ? data.subscriberCountRaw : syncFallback.subscriberCountRaw,
+         growthRate: data.growthRate ?? syncFallback.growthRate,
+         profileUrl: data.profileUrl || syncFallback.profileUrl,
+         verified: data.verified ?? false,
       };
     }
   } catch (err) {
