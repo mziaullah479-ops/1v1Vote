@@ -32,8 +32,10 @@ export const SocialFollowerLiveBadge: React.FC<SocialFollowerLiveBadgeProps> = (
     }
   };
 
-  const followersDisplay = creator.followersCount || creator.subscribers || '1.0M';
-  const growthRate = creator.growthRate || '+1.5k today';
+  const followersDisplay = creator.followersCount || creator.subscribers || 'Unavailable';
+  const growthRate = creator.growthRate || 'Unavailable';
+  const hasGrowthRate = Boolean(creator.growthRate);
+  const hasPublicStats = followersDisplay !== 'Unavailable';
   const url = creator.profileUrl || (creator.handle ? `https://youtube.com/${creator.handle}` : '#');
 
   if (size === 'sm') {
@@ -41,8 +43,8 @@ export const SocialFollowerLiveBadge: React.FC<SocialFollowerLiveBadgeProps> = (
       <div className="inline-flex items-center gap-1.5 bg-[#091122]/90 border border-slate-800/80 px-2 py-0.5 rounded-md text-[10px]">
         {getPlatformIcon(creator.platform)}
         <span className="text-white font-bold">{followersDisplay}</span>
-        <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
-          <TrendingUp className="w-2.5 h-2.5" />
+        <span className={`${hasGrowthRate ? 'text-emerald-400' : 'text-slate-500'} font-semibold flex items-center gap-0.5`}>
+          {hasGrowthRate && <TrendingUp className="w-2.5 h-2.5" />}
           {growthRate}
         </span>
       </div>
@@ -66,7 +68,7 @@ export const SocialFollowerLiveBadge: React.FC<SocialFollowerLiveBadgeProps> = (
         {/* Live Pulse Indicator */}
         <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] text-emerald-300 font-bold shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>LIVE STATS</span>
+          <span>{hasPublicStats ? 'PUBLIC STATS' : 'STATS UNAVAILABLE'}</span>
         </div>
       </div>
 
@@ -81,8 +83,8 @@ export const SocialFollowerLiveBadge: React.FC<SocialFollowerLiveBadgeProps> = (
           </span>
         </div>
 
-        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-900/40">
-          <TrendingUp className="w-3 h-3 text-emerald-400" />
+        <div className={`${hasGrowthRate ? 'text-emerald-400 bg-emerald-950/40 border-emerald-900/40' : 'text-slate-500 bg-slate-900/40 border-slate-800'} flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-md border`}>
+          {hasGrowthRate && <TrendingUp className="w-3 h-3 text-emerald-400" />}
           <span>{growthRate}</span>
         </div>
       </div>
