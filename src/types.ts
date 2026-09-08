@@ -72,6 +72,7 @@ export interface UserProfile {
   avatar: string;
   votedMatchIds: { matchId: string; creatorId: string; timestamp: string }[];
   points: number;
+  role?: 'user' | 'admin';
 }
 
 export interface LiveVoteEvent {
