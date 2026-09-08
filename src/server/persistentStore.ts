@@ -160,6 +160,7 @@ export class PersistentStore {
   static async open(dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data')) {
     const databasePath = path.join(dataDir, '1v1vote.json');
     const backupDir = process.env.BACKUP_DIR || path.join(dataDir, 'backups');
+    await mkdir(dataDir, { recursive: true });
     await mkdir(backupDir, { recursive: true });
 
     let state = emptyState();
