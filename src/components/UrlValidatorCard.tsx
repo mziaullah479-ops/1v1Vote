@@ -143,7 +143,7 @@ export const UrlValidatorCard: React.FC<UrlValidatorCardProps> = ({
             result.isValidUrl ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                Verified ({result.latencyMs}ms)
+                Valid URL ({result.latencyMs}ms)
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
@@ -237,7 +237,7 @@ export const UrlValidatorCard: React.FC<UrlValidatorCardProps> = ({
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Pre-fetched Creator Metadata
+                Public Creator Metadata
               </span>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300">
                 {result.platform}
@@ -291,7 +291,7 @@ export const UrlValidatorCard: React.FC<UrlValidatorCardProps> = ({
                 <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
                   <span className="font-mono text-sky-300">{result.handle}</span>
                   <span>•</span>
-                  <span className="text-emerald-400 font-semibold">{result.followersCount} followers</span>
+                   <span className="text-slate-400 font-semibold">{result.followersCount || 'Unavailable'} followers</span>
                 </div>
               </div>
             </div>
@@ -321,7 +321,7 @@ export const UrlValidatorCard: React.FC<UrlValidatorCardProps> = ({
           </div>
 
           <div className="pt-1 text-[10px] text-slate-400 flex items-center justify-between border-t border-slate-800/60">
-            <span className="truncate">{result.summary}</span>
+                   <span className="truncate">{result.summary}</span>
             <span className="text-slate-500 shrink-0 ml-2 font-mono">{result.checkedAt}</span>
           </div>
         </div>
