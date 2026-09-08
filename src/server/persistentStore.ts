@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createClient, type Client } from '@libsql/client';
 import { Comment, Match, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES } from '../data/seedData';
 
@@ -150,6 +151,7 @@ export class PersistentStore {
     private readonly dataDir: string,
     private readonly databasePath: string,
     private readonly backupDir: string,
+    private readonly remoteDatabase: Client | undefined,
     state: DatabaseState,
   ) {
     this.state = state;
@@ -161,15 +163,45 @@ export class PersistentStore {
     await mkdir(backupDir, { recursive: true });
 
     let state = emptyState();
+    let localState: DatabaseState | undefined;
     try {
-      state = normalizeState(JSON.parse(await readFile(databasePath, 'utf8')) as Partial<DatabaseState>);
+      localState = normalizeState(JSON.parse(await readFile(databasePath, 'utf8')) as Partial<DatabaseState>);
     } catch (error: any) {
       if (error?.code !== 'ENOENT') {
         console.error('Database file could not be read. Starting from seed data.', error);
       }
     }
 
-    const store = new PersistentStore(dataDir, databasePath, backupDir, state);
+    const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
+    const tursoToken = process.env.TURSO_AUTH_TOKEN?.trim();
+    if (tursoUrl && !tursoToken) throw new Error('TURSO_AUTH_TOKEN must be configured with TURSO_DATABASE_URL.');
+    if (tursoToken && !tursoUrl) throw new Error('TURSO_DATABASE_URL must be configured with TURSO_AUTH_TOKEN.');
+
+    let remoteDatabase: Client | undefined;
+    if (tursoUrl && tursoToken) {
+      remoteDatabase = createClient({ url: tursoUrl, authToken: tursoToken });
+      await remoteDatabase.execute(`
+        CREATE TABLE IF NOT EXISTS app_state (
+          id INTEGER PRIMARY KEY,
+          state TEXT NOT NULL
+        )
+      `);
+      const result = await remoteDatabase.execute('SELECT state FROM app_state WHERE id = 1');
+      const remoteState = result.rows[0]?.state;
+      if (remoteState) {
+        state = normalizeState(JSON.parse(String(remoteState)) as Partial<DatabaseState>);
+      } else {
+        state = localState || state;
+        await remoteDatabase.execute({
+          sql: 'INSERT INTO app_state (id, state) VALUES (1, ?)',
+          args: [JSON.stringify(state)],
+        });
+      }
+    } else {
+      state = localState || state;
+    }
+
+    const store = new PersistentStore(dataDir, databasePath, backupDir, remoteDatabase, state);
     await store.persist();
     return store;
   }
@@ -177,6 +209,13 @@ export class PersistentStore {
   private async persist() {
     const snapshot = JSON.stringify(this.state, null, 2);
     this.writeQueue = this.writeQueue.catch(() => undefined).then(async () => {
+      if (this.remoteDatabase) {
+        await this.remoteDatabase.execute({
+          sql: `INSERT INTO app_state (id, state) VALUES (1, ?)
+            ON CONFLICT(id) DO UPDATE SET state = excluded.state`,
+          args: [snapshot],
+        });
+      }
       const temporaryPath = `${this.databasePath}.${process.pid}.tmp`;
       await writeFile(temporaryPath, snapshot, 'utf8');
       await rename(temporaryPath, this.databasePath);
@@ -443,7 +482,13 @@ export class PersistentStore {
     await this.persist();
     const name = `1v1vote-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     const target = path.join(this.backupDir, name);
-    await copyFile(this.databasePath, target);
+    if (this.remoteDatabase) {
+      const result = await this.remoteDatabase.execute('SELECT state FROM app_state WHERE id = 1');
+      const remoteState = result.rows[0]?.state;
+      await writeFile(target, remoteState ? String(remoteState) : JSON.stringify(this.state, null, 2), 'utf8');
+    } else {
+      await copyFile(this.databasePath, target);
+    }
     const files = (await readdir(this.backupDir)).filter((file) => file.startsWith('1v1vote-')).sort().reverse();
     await Promise.all(files.slice(14).map((file) => unlink(path.join(this.backupDir, file))));
     return { name, path: target };
@@ -453,4 +498,3 @@ export class PersistentStore {
     return (await readdir(this.backupDir)).filter((file) => file.startsWith('1v1vote-')).sort().reverse();
   }
 }
-
