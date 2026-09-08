@@ -324,7 +324,6 @@ export default function App() {
             <StockTradingChart
               match={currentMatch}
               onOpenShareModal={() => setIsShareModalOpen(true)}
-              onVote={handleVote}
             />
 
             {/* 3. Vote Share Progress Cards */}
