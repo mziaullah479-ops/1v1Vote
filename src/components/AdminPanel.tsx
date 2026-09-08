@@ -12,15 +12,15 @@ interface AdminPanelProps {
 }
 
 function parseSubscribersToRaw(subsStr: string): number {
-  if (!subsStr) return 1000000;
+  if (!subsStr) return 0;
   const clean = subsStr.trim().toUpperCase();
   const match = clean.match(/([\d.]+)\s*([MK]?)/);
-  if (!match) return 1000000;
+  if (!match) return 0;
   const val = parseFloat(match[1]);
   const unit = match[2];
   if (unit === 'M') return Math.floor(val * 1000000);
   if (unit === 'K') return Math.floor(val * 1000);
-  return Math.floor(val) || 1000000;
+  return Math.floor(val) || 0;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onEndMatch, onBackup }) => {
@@ -32,7 +32,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
   const [c1Platform, setC1Platform] = useState<Platform>('YouTube');
   const [c1Region, setC1Region] = useState<Region>('Pakistan');
   const [c1ProfileUrl, setC1ProfileUrl] = useState('');
-  const [c1Growth, setC1Growth] = useState('+1,800 today');
+  const [c1Growth, setC1Growth] = useState('');
   const [isDetectingC1, setIsDetectingC1] = useState(false);
   const [c1UrlValid, setC1UrlValid] = useState(true);
 
@@ -43,7 +43,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
   const [c2Platform, setC2Platform] = useState<Platform>('YouTube');
   const [c2Region, setC2Region] = useState<Region>('USA');
   const [c2ProfileUrl, setC2ProfileUrl] = useState('');
-  const [c2Growth, setC2Growth] = useState('+2,400 today');
+  const [c2Growth, setC2Growth] = useState('');
   const [isDetectingC2, setIsDetectingC2] = useState(false);
   const [c2UrlValid, setC2UrlValid] = useState(true);
 
@@ -56,7 +56,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
     setC1ProfileUrl(url);
     if (!url.trim()) return;
     setIsDetectingC1(true);
-    setStatusMessage('یو آر ایل سے حقیقی سبسکرائبرز اور چینل کا لوگو حاصل کیا جا رہا ہے (Fetching real channel stats & logo)...');
+    setStatusMessage('پروفائل کا public metadata حاصل کیا جا رہا ہے (Fetching public profile metadata)...');
     try {
       const detected = await fetchSocialProfile(url, c1Name);
       setC1Platform(detected.platform);
@@ -67,7 +67,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
       setC1Avatar(realLogo); // Default to genuine channel logo
       setC1Subs(detected.followersCount);
       setC1Growth(detected.growthRate);
-      setStatusMessage(`✓ چینل کا اصل لوگو اور ${detected.followersCount} سبسکرائبرز کامیابی سے ڈیٹیکٹ ہو گئے!`);
+      setStatusMessage(`✓ پروفائل metadata حاصل ہو گیا۔ Public follower count: ${detected.followersCount || 'Unavailable'}`);
     } catch (e) {
       console.error('Error auto-detecting C1:', e);
       setStatusMessage('Auto-detect finished with available channel data.');
@@ -80,7 +80,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
     setC2ProfileUrl(url);
     if (!url.trim()) return;
     setIsDetectingC2(true);
-    setStatusMessage('یو آر ایل سے حقیقی سبسکرائبرز اور چینل کا لوگو حاصل کیا جا رہا ہے (Fetching real channel stats & logo)...');
+    setStatusMessage('پروفائل کا public metadata حاصل کیا جا رہا ہے (Fetching public profile metadata)...');
     try {
       const detected = await fetchSocialProfile(url, c2Name);
       setC2Platform(detected.platform);
@@ -91,7 +91,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
       setC2Avatar(realLogo); // Default to genuine channel logo
       setC2Subs(detected.followersCount);
       setC2Growth(detected.growthRate);
-      setStatusMessage(`✓ چینل کا اصل لوگو اور ${detected.followersCount} سبسکرائبرز کامیابی سے ڈیٹیکٹ ہو گئے!`);
+      setStatusMessage(`✓ پروفائل metadata حاصل ہو گیا۔ Public follower count: ${detected.followersCount || 'Unavailable'}`);
     } catch (e) {
       console.error('Error auto-detecting C2:', e);
       setStatusMessage('Auto-detect finished with available channel data.');
@@ -130,16 +130,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
       name: c1Name.trim(),
       slug: c1Name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       avatar: finalAvatar1,
-      subscribers: c1Subs.trim() || '1.0M',
+       subscribers: c1Subs.trim() || 'Unavailable',
       subscriberCountRaw: rawSubs1,
       platform: c1Platform,
       region: c1Region,
-      verified: true,
+       verified: false,
       color: '#38bdf8',
       profileUrl: c1ProfileUrl.trim() || undefined,
-      followersCount: c1Subs.trim() || '1.0M',
-      growthRate: c1Growth || '+1,800 today',
-      growthTrend: 'up',
+       followersCount: c1Subs.trim() || 'Unavailable',
+       growthRate: c1Growth || 'Unavailable',
+       growthTrend: c1Growth ? 'up' : 'neutral',
     };
 
     const creator2: Creator = {
@@ -147,16 +147,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
       name: c2Name.trim(),
       slug: c2Name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       avatar: finalAvatar2,
-      subscribers: c2Subs.trim() || '1.0M',
+       subscribers: c2Subs.trim() || 'Unavailable',
       subscriberCountRaw: rawSubs2,
       platform: c2Platform,
       region: c2Region,
-      verified: true,
+       verified: false,
       color: '#fb923c',
       profileUrl: c2ProfileUrl.trim() || undefined,
-      followersCount: c2Subs.trim() || '1.0M',
-      growthRate: c2Growth || '+2,000 today',
-      growthTrend: 'up',
+       followersCount: c2Subs.trim() || 'Unavailable',
+       growthRate: c2Growth || 'Unavailable',
+       growthTrend: c2Growth ? 'up' : 'neutral',
     };
 
     const startTime = new Date().toISOString();
