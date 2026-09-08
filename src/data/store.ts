@@ -59,9 +59,12 @@ export class MatchStore {
   private static currentUser: UserProfile | null = null;
   private static listeners: Array<() => void> = [];
   private static recentVoteEvents: LiveVoteEvent[] = [];
+  private static initialized = false;
 
   static init() {
     if (typeof window === 'undefined') return;
+    if (this.initialized) return;
+    this.initialized = true;
 
     try {
       const savedMatches = localStorage.getItem(MATCHES_STORAGE_KEY);
@@ -103,7 +106,7 @@ export class MatchStore {
 
     // Set up rapid, dynamic live simulated votes every 2.5s to keep the trading chart actively moving
     if (typeof window !== 'undefined') {
-      setInterval(() => {
+      window.setInterval(() => {
         this.simulateRealtimeVotes();
       }, 2500);
     }
