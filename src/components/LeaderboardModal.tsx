@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Trophy, Medal, Flame, Award } from 'lucide-react';
 import { UserProfile } from '../types';
+import { MatchStore } from '../data/store';
 
 interface LeaderboardModalProps {
   isOpen: boolean;
@@ -8,21 +9,30 @@ interface LeaderboardModalProps {
   currentUser: UserProfile | null;
 }
 
+const FALLBACK_VOTERS = [
+  { rank: 1, name: 'Hamza_Voter_PK', votes: 142, points: 2130, badge: 'Grandmaster' },
+  { rank: 2, name: 'JimmyFanUSA', votes: 128, points: 1920, badge: 'Master' },
+  { rank: 3, name: 'Aarav_DesiClash', votes: 115, points: 1725, badge: 'Master' },
+  { rank: 4, name: 'SpeedGang_99', votes: 98, points: 1470, badge: 'Diamond' },
+  { rank: 5, name: 'SistrologyFanGirl', votes: 84, points: 1260, badge: 'Platinum' },
+  { rank: 6, name: 'KaiMafia_Official', votes: 76, points: 1140, badge: 'Gold' },
+];
+
 export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
   isOpen,
   onClose,
   currentUser,
 }) => {
-  if (!isOpen) return null;
+  const [topVoters, setTopVoters] = useState(FALLBACK_VOTERS);
 
-  const topVoters = [
-    { rank: 1, name: 'Hamza_Voter_PK', votes: 142, points: 2130, badge: 'Grandmaster' },
-    { rank: 2, name: 'JimmyFanUSA', votes: 128, points: 1920, badge: 'Master' },
-    { rank: 3, name: 'Aarav_DesiClash', votes: 115, points: 1725, badge: 'Master' },
-    { rank: 4, name: 'SpeedGang_99', votes: 98, points: 1470, badge: 'Diamond' },
-    { rank: 5, name: 'SistrologyFanGirl', votes: 84, points: 1260, badge: 'Platinum' },
-    { rank: 6, name: 'KaiMafia_Official', votes: 76, points: 1140, badge: 'Gold' },
-  ];
+  useEffect(() => {
+    if (!isOpen) return;
+    void MatchStore.getLeaderboard().then((leaderboard) => {
+      if (leaderboard.length) setTopVoters(leaderboard);
+    });
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
