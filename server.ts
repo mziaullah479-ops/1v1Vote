@@ -108,6 +108,22 @@ async function startServer() {
     return res.json({ match, comments: store.getSnapshot().comments[match.id] || [] });
   });
 
+  app.post('/api/matches/:matchId/view', async (req, res) => {
+    try {
+      return res.json({ match: await store.recordView(req.params.matchId) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/matches/:matchId/share', async (req, res) => {
+    try {
+      return res.json({ match: await store.recordShare(req.params.matchId) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.get('/api/leaderboard', (_req, res) => {
     res.json({ leaderboard: store.getLeaderboard() });
   });
@@ -298,10 +314,20 @@ async function startServer() {
     app.use(express.static(distPath, { index: false }));
     app.get('*', (_req, res) => {
       const measurementId = process.env.VITE_GA_MEASUREMENT_ID?.trim();
-      const runtimeConfig = JSON.stringify({ gaMeasurementId: measurementId || undefined });
+      const runtimeConfig = JSON.stringify({
+        gaMeasurementId: measurementId || undefined,
+        gtmId: process.env.VITE_GTM_CONTAINER_ID?.trim() || undefined,
+        adsenseClientId: process.env.VITE_ADSENSE_CLIENT_ID?.trim() || undefined,
+        adsenseSlots: {
+          'header-banner': process.env.VITE_ADSENSE_SLOT_HEADER_BANNER?.trim() || undefined,
+          'in-content': process.env.VITE_ADSENSE_SLOT_IN_CONTENT?.trim() || undefined,
+          sidebar: process.env.VITE_ADSENSE_SLOT_SIDEBAR?.trim() || undefined,
+          'footer-banner': process.env.VITE_ADSENSE_SLOT_FOOTER_BANNER?.trim() || undefined,
+        },
+      });
       const html = fs
         .readFileSync(indexPath, 'utf8')
-        .replace('</head>', '<script>window.__RUNTIME_CONFIG__=' + runtimeConfig + ';</script></head>');
+        .replace('</head>', `<script>window.__RUNTIME_CONFIG__=${runtimeConfig};</script></head>`);
       return res.type('html').send(html);
     });
   }
