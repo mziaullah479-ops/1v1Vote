@@ -1,5 +1,13 @@
 import { Match, Comment } from '../types';
 
+function extraCreator(id: string, name: string, slug: string, region: Match['region'], color: string, profileUrl: string): Match['creator1'] {
+  return { id, name, slug, avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(name) + '&backgroundColor=' + color.replace('#', ''), subscribers: 'Public stats', subscriberCountRaw: 0, platform: 'YouTube', region, verified: false, handle: '@' + slug.replace(/-/g, ''), color, profileUrl, followersCount: '', growthRate: '', growthTrend: 'neutral' };
+}
+
+function extraMatch(id: string, slug: string, title: string, creator1: Match['creator1'], creator2: Match['creator1'], region: Match['region'], description: string, isTrending = false): Match {
+  return { id, slug, title, creator1, creator2, votes1: 0, votes2: 0, likes1: 0, likes2: 0, views: 0, shares: 0, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString(), status: 'active', isTrending, category: 'YouTube', region, description, historyPoints: [{ timestamp: new Date().toISOString(), timeLabel: 'Live', p1: 50, p2: 50 }] };
+}
+
 export const INITIAL_MATCHES: Match[] = [
   {
     id: 'match-1',
@@ -288,6 +296,12 @@ export const INITIAL_MATCHES: Match[] = [
       { timestamp: '2026-09-06T00:00:00Z', timeLabel: '12:00 AM', p1: 48.1, p2: 51.9 },
     ],
   },
+  ...[
+    extraMatch('match-6', 'nadir-ali-vs-irfan-junejo', 'Nadir Ali vs Irfan Junejo', extraCreator('c-nadir-ali', 'Nadir Ali', 'nadir-ali', 'Pakistan', '#38bdf8', 'https://youtube.com/@NadirAliOfficial'), extraCreator('c-irfan-junejo', 'Irfan Junejo', 'irfan-junejo', 'Pakistan', '#fb923c', 'https://youtube.com/@IrfanJunejo'), 'Pakistan', 'A Pakistani creator faceoff built for fans of interviews, storytelling, and cinematic vlogs.', true),
+    extraMatch('match-7', 'mooroo-vs-junaid-akram', 'Mooroo vs Junaid Akram', extraCreator('c-mooroo', 'Mooroo', 'mooroo', 'Pakistan', '#818cf8', 'https://youtube.com/@Mooroo'), extraCreator('c-junaid-akram', 'Junaid Akram', 'junaid-akram', 'Pakistan', '#f472b6', 'https://youtube.com/@JunaidAkram'), 'Pakistan', 'A thoughtful Pakistani creator matchup for viewers who love commentary, culture, and sharp conversations.'),
+    extraMatch('match-8', 'zaid-ali-t-vs-shahveer-jafry', 'Zaid Ali T vs Shahveer Jafry', extraCreator('c-zaid-ali-t', 'Zaid Ali T', 'zaid-ali-t', 'Pakistan', '#2dd4bf', 'https://youtube.com/@ZaidAliT'), extraCreator('c-shahveer-jafry', 'Shahveer Jafry', 'shahveer-jafry', 'Pakistan', '#fbbf24', 'https://youtube.com/@ShahveerJafry'), 'Pakistan', 'A lighthearted creator clash for the modern Pakistani creator scene.'),
+    extraMatch('match-9', 'sourav-joshi-vs-flying-beast', 'Sourav Joshi vs Flying Beast', extraCreator('c-sourav-joshi', 'Sourav Joshi', 'sourav-joshi', 'India', '#4ade80', 'https://youtube.com/@SouravJoshiVlogs'), extraCreator('c-flying-beast', 'Flying Beast', 'flying-beast', 'India', '#f87171', 'https://youtube.com/@FlyingBeast320'), 'India', 'A family-vlogging faceoff for viewers across the Indian creator community.'),
+  ],
   // Past matches
   {
     id: 'match-past-1',
