@@ -41,6 +41,8 @@ export interface Match {
   status: 'active' | 'ended';
   winnerId?: string;
   isTrending?: boolean;
+  views?: number;
+  shares?: number;
   category: Platform | 'All';
   region: Region;
   historyPoints: ChartDataPoint[];
