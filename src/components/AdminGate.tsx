@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
-import { Match } from '../types';
+import { Match, MatchRequest } from '../types';
 import { AdminPanel } from './AdminPanel';
 
 interface AdminGateProps {
@@ -17,6 +17,7 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(true);
+  const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([]);
 
   useEffect(() => {
     fetch('/api/admin/session', { credentials: 'include' })
@@ -28,6 +29,26 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
       .catch(() => setError('Admin service is unavailable on this deployment.'))
       .finally(() => setChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    fetch('/api/admin/match-requests', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : { requests: [] })
+      .then((data) => setMatchRequests(data.requests || []))
+      .catch(() => undefined);
+  }, [authenticated]);
+
+  const reviewMatchRequest = async (requestId: string, decision: 'approve' | 'reject', adminNote: string) => {
+    const response = await fetch(`/api/admin/match-requests/${encodeURIComponent(requestId)}/review`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision, adminNote }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to review this request.');
+    setMatchRequests((current) => current.map((request) => request.id === requestId ? data.result.request : request));
+  };
 
   const login = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -89,7 +110,7 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
         <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-400" />Secure admin session</span>
         <button onClick={logout} className="flex items-center gap-1.5 hover:text-white"><LogOut className="h-3.5 w-3.5" />Sign out</button>
       </div>
-      <AdminPanel matches={matches} onAddMatch={onAddMatch} onEndMatch={onEndMatch} onBackup={onBackup} />
+      <AdminPanel matches={matches} matchRequests={matchRequests} onReviewMatchRequest={reviewMatchRequest} onAddMatch={onAddMatch} onEndMatch={onEndMatch} onBackup={onBackup} />
     </div>
   );
 };

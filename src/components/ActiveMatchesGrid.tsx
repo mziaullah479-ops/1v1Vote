@@ -18,7 +18,7 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
   const [regionFilter, setRegionFilter] = useState<string>('All');
 
   const filteredMatches = matches.filter((m) => {
-    if (m.status !== 'active') return false;
+    if (m.status !== 'active' || new Date(m.endTime).getTime() <= Date.now()) return false;
     if (platformFilter !== 'All' && m.creator1.platform !== platformFilter && m.creator2.platform !== platformFilter && m.category !== platformFilter) {
       return false;
     }
@@ -36,6 +36,8 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
     if (days > 0) return `${days}d ${hours}h left`;
     return `${hours}h left`;
   };
+
+  const isUpcoming = (match: Match) => new Date(match.startTime).getTime() > Date.now();
 
   return (
     <section id="active-matches-section" className="w-full max-w-6xl mx-auto my-10 px-2 sm:px-4">
@@ -120,14 +122,14 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
               >
                 {/* Card Top: Badges */}
                 <div className="flex items-center justify-between mb-4">
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-0.5 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    LIVE BATTLE
+                  <span className={`flex items-center gap-1 text-[11px] font-semibold ${isUpcoming(m) ? 'text-amber-300 bg-amber-950/60 border-amber-800/60' : 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'} border px-2.5 py-0.5 rounded-full`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isUpcoming(m) ? 'bg-amber-300' : 'bg-emerald-400 animate-pulse'}`}></span>
+                    {isUpcoming(m) ? 'SCHEDULED' : 'LIVE BATTLE'}
                   </span>
 
                   <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
                     <Clock className="w-3 h-3 text-slate-500" />
-                    {calculateTimeRemaining(m.endTime)}
+                    {isUpcoming(m) ? `Starts in ${calculateTimeRemaining(m.startTime)}` : calculateTimeRemaining(m.endTime)}
                   </span>
                 </div>
 

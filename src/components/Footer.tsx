@@ -3,7 +3,7 @@ import { ShieldCheck, Heart, Sparkles } from 'lucide-react';
 import { AdSensePlaceholder } from './AdSensePlaceholder';
 
 interface FooterProps {
-  onSelectTab: (tab: 'home' | 'battles' | 'leaderboard' | 'about' | 'admin') => void;
+  onSelectTab: (tab: 'home' | 'battles' | 'leaderboard' | 'about' | 'request' | 'admin') => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onSelectTab }) => {
@@ -37,6 +37,9 @@ export const Footer: React.FC<FooterProps> = ({ onSelectTab }) => {
           </button>
           <button onClick={() => onSelectTab('about')} className="hover:text-white transition-colors">
             About Platform
+          </button>
+          <button onClick={() => onSelectTab('request')} className="hover:text-amber-300 transition-colors">
+            Request a Match
           </button>
         </div>
       </div>

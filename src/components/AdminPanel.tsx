@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { PlusCircle, BarChart3, AlertTriangle, CheckCircle, Flame, Users, Calendar, Trophy, Trash2, Link, Sparkles, Image, RefreshCw, Loader2, Check, ShieldCheck } from 'lucide-react';
-import { Match, Creator, Platform, Region } from '../types';
+import { Match, MatchRequest, Creator, Platform, Region } from '../types';
 import { fetchSocialProfile } from '../utils/socialDetector';
 import { UrlValidatorCard } from './UrlValidatorCard';
 
 interface AdminPanelProps {
   matches: Match[];
+  matchRequests: MatchRequest[];
+  onReviewMatchRequest: (requestId: string, decision: 'approve' | 'reject', adminNote: string) => Promise<void>;
   onAddMatch: (matchData: Partial<Match>) => void;
   onEndMatch: (matchId: string, winnerId?: string) => void;
   onBackup: () => Promise<void>;
@@ -23,7 +25,7 @@ function parseSubscribersToRaw(subsStr: string): number {
   return Math.floor(val) || 0;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onEndMatch, onBackup }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, onReviewMatchRequest, onAddMatch, onEndMatch, onBackup }) => {
   // Form states
   const [c1Name, setC1Name] = useState('');
   const [c1Avatar, setC1Avatar] = useState('');
@@ -201,6 +203,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
     setTimeout(() => setStatusMessage(''), 5000);
   };
 
+  const handleReviewRequest = async (request: MatchRequest, decision: 'approve' | 'reject') => {
+    try {
+      await onReviewMatchRequest(request.id, decision, decision === 'approve' ? 'Ownership and payment verified by admin.' : 'Please contact support for more details.');
+      setStatusMessage(decision === 'approve' ? 'Request approved and scheduled match published.' : 'Request rejected and marked for follow-up.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Unable to review the request.');
+    }
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto my-8 px-2 sm:px-4 animate-fade-in">
       {/* Top Banner */}
@@ -256,6 +267,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, onAddMatch, onE
           {statusMessage}
         </div>
       )}
+
+      <section className="mb-8 rounded-3xl border border-amber-500/30 bg-[#0b1324] p-5 shadow-xl sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black text-white">User match requests</h2>
+            <p className="mt-1 text-xs text-slate-400">Verify both public profile links, ownership proof and payment reference before approval.</p>
+          </div>
+          <span className="rounded-full border border-amber-500/40 bg-amber-950/40 px-3 py-1 text-xs font-bold text-amber-300">{matchRequests.filter((request) => request.status === 'pending').length} pending</span>
+        </div>
+        {matchRequests.length === 0 ? (
+          <p className="rounded-2xl border border-slate-800 bg-[#080d1a] p-4 text-xs text-slate-500">No user requests yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {matchRequests.map((request) => (
+              <div key={request.id} className="rounded-2xl border border-slate-800 bg-[#080d1a] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-white">{request.creator1.name} vs {request.creator2.name}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">By {request.userName} · {request.durationHours}h · PKR {request.paymentAmountPkr.toLocaleString()} · {request.paymentStatus}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${request.status === 'pending' ? 'bg-amber-950 text-amber-300' : request.status === 'approved' ? 'bg-emerald-950 text-emerald-300' : 'bg-rose-950 text-rose-300'}`}>{request.status}</span>
+                </div>
+                <div className="mt-3 grid gap-2 text-[11px] text-slate-300 sm:grid-cols-2">
+                  <a href={request.creator1.profileUrl} target="_blank" rel="noreferrer" className="truncate text-sky-300 hover:underline">Creator 1: {request.creator1.profileUrl}</a>
+                  <a href={request.creator2.profileUrl} target="_blank" rel="noreferrer" className="truncate text-orange-300 hover:underline">Creator 2: {request.creator2.profileUrl}</a>
+                  <span>Payment reference: <strong className="text-white">{request.paymentReference}</strong></span>
+                  <span>Starts: <strong className="text-white">{new Date(request.startTime).toLocaleString()}</strong></span>
+                </div>
+                <p className="mt-3 rounded-xl border border-slate-800 bg-[#060b16] p-3 text-xs leading-5 text-slate-400"><strong className="text-slate-200">Ownership plan:</strong> {request.ownershipNote}</p>
+                {request.status === 'pending' && <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => void handleReviewRequest(request, 'approve')} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500">Verify & approve</button><button onClick={() => void handleReviewRequest(request, 'reject')} className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-200 hover:bg-rose-900/40">Reject request</button></div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Grid: Create New Match & Active Matches Table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

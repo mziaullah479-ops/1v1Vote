@@ -20,6 +20,7 @@ export const BattlePageHeader: React.FC<BattlePageHeaderProps> = ({
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
 
   const activeMatches = allMatches.filter((m) => m.status === 'active');
+  const isUpcoming = new Date(currentMatch.startTime).getTime() > Date.now();
 
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 pt-4 pb-2">
@@ -85,9 +86,9 @@ export const BattlePageHeader: React.FC<BattlePageHeaderProps> = ({
             <Eye className="w-3.5 h-3.5 text-sky-400" />
             {(currentMatch.views || 0).toLocaleString()} views
           </span>
-          <span className="hidden sm:flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            LIVE 1v1 ARENA
+          <span className={`hidden sm:flex items-center gap-1 text-[11px] font-bold ${isUpcoming ? 'text-amber-300 bg-amber-950/60 border-amber-800/60' : 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'} border px-2.5 py-1 rounded-full`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isUpcoming ? 'bg-amber-300' : 'bg-emerald-400 animate-pulse'}`}></span>
+            {isUpcoming ? 'SCHEDULED 1v1' : 'LIVE 1v1 ARENA'}
           </span>
 
           <button

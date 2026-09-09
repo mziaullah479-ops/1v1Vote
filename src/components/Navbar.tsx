@@ -3,8 +3,8 @@ import { BarChart3, Info, Search, User, LogOut, Menu, X, Flame } from 'lucide-re
 import { UserProfile } from '../types';
 
 interface NavbarProps {
-  currentTab: 'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'admin';
-  onSelectTab: (tab: 'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'admin') => void;
+  currentTab: 'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'request' | 'admin';
+  onSelectTab: (tab: 'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'request' | 'admin') => void;
   user: UserProfile | null;
   onOpenAuth: () => void;
   onLogout: () => void;
@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (onSearchQuery) onSearchQuery(e.target.value);
   };
 
-  const handleNavClick = (tab: 'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'admin') => {
+  const handleNavClick = (tab: 'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'request' | 'admin') => {
     onSelectTab(tab);
     setMobileMenuOpen(false);
   };
@@ -110,6 +110,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Info className="w-3.5 h-3.5" />
             About
+          </button>
+
+          <button
+            id="nav-request"
+            onClick={() => handleNavClick('request')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              currentTab === 'request'
+                ? 'bg-amber-600 text-white shadow-[0_0_12px_rgba(245,158,11,0.55)]'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            Request Match
           </button>
 
         </nav>
@@ -235,6 +247,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Info className="w-4 h-4 text-sky-400" />
             <span>About 1v1Vote</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('request')}
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              currentTab === 'request'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'text-slate-300 hover:bg-slate-800/70'
+            }`}
+          >
+            <span className="text-amber-300">$</span>
+            <span>Request a Match</span>
           </button>
 
         </div>

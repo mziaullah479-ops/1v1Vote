@@ -36,6 +36,7 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
   const [lastComboTimer2, setLastComboTimer2] = useState<NodeJS.Timeout | null>(null);
 
   const handleVoteClick = (creatorId: string) => {
+    if (isUpcoming) return;
     // Trigger celebratory confetti
     confetti({
       particleCount: 80,
@@ -100,6 +101,7 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
   const totalVotes = match.votes1 + match.votes2;
   const votesRatio1 = totalVotes > 0 ? ((match.votes1 / totalVotes) * 100).toFixed(1) : '50.0';
   const votesRatio2 = totalVotes > 0 ? ((match.votes2 / totalVotes) * 100).toFixed(1) : '50.0';
+  const isUpcoming = new Date(match.startTime).getTime() > Date.now();
 
   return (
     <div className="relative w-full max-w-6xl mx-auto py-2 px-2 sm:px-4">
@@ -241,14 +243,17 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
             <div className="mt-4 flex flex-col items-center">
               <button
                 id={`btn-vote-${match.creator1.id}`}
+                disabled={isUpcoming}
                 onClick={() => handleVoteClick(match.creator1.id)}
-                className={`w-full py-3 px-6 rounded-full font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
+                className={`w-full py-3 px-6 rounded-full font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                   isVotedC1
                     ? 'bg-emerald-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]'
                     : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_25px_rgba(37,99,235,0.6)] hover:shadow-[0_0_35px_rgba(56,189,248,0.75)] active:scale-[0.98]'
                 }`}
               >
-                {isVotedC1 ? (
+                {isUpcoming ? (
+                  <span>VOTING OPENS SOON</span>
+                ) : isVotedC1 ? (
                   <>
                     <Check className="w-4 h-4 stroke-[3]" />
                     <span>Voted ✓</span>
@@ -419,14 +424,17 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
             <div className="mt-4 flex flex-col items-center">
               <button
                 id={`btn-vote-${match.creator2.id}`}
+                disabled={isUpcoming}
                 onClick={() => handleVoteClick(match.creator2.id)}
-                className={`w-full py-3 px-6 rounded-full font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
+                className={`w-full py-3 px-6 rounded-full font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                   isVotedC2
                     ? 'bg-emerald-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]'
                     : 'bg-orange-600 hover:bg-orange-500 text-white shadow-[0_0_25px_rgba(234,88,12,0.6)] hover:shadow-[0_0_35px_rgba(249,115,22,0.75)] active:scale-[0.98]'
                 }`}
               >
-                {isVotedC2 ? (
+                {isUpcoming ? (
+                  <span>VOTING OPENS SOON</span>
+                ) : isVotedC2 ? (
                   <>
                     <Check className="w-4 h-4 stroke-[3]" />
                     <span>Voted ✓</span>
