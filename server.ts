@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 import { scrapeSocialProfile } from './src/server/socialScraper';
 import { PersistentStore, StoreError } from './src/server/persistentStore';
+import { MATCH_REQUEST_PLANS } from './src/data/matchPricing';
 
 const ADMIN_COOKIE = 'v1_admin_session';
 const SESSION_COOKIE = 'v1_user_session';
@@ -133,6 +134,30 @@ async function startServer() {
     res.json({ authenticated: Boolean(user), user: user ? store.publicUser(user) : null });
   });
 
+  app.get('/api/match-request-config', (_req, res) => {
+    res.json({
+      plans: MATCH_REQUEST_PLANS,
+      paymentAccountLabel: process.env.PAYMENT_ACCOUNT_LABEL?.trim() || 'Payment details will be shown by the admin.',
+      paymentInstructions: process.env.PAYMENT_INSTRUCTIONS?.trim() || 'Submit your payment through the approved account and enter the transaction reference below. An admin verifies it before publishing.',
+    });
+  });
+
+  app.get('/api/match-requests', (req, res) => {
+    const user = getUser(req);
+    if (!user) return res.status(401).json({ error: 'Please sign in to view your match requests.' });
+    return res.json({ requests: store.getMatchRequests(user.id) });
+  });
+
+  app.post('/api/match-requests', async (req, res) => {
+    const user = getUser(req);
+    if (!user) return res.status(401).json({ error: 'Please sign in before submitting a match request.', code: 'AUTH_REQUIRED' });
+    try {
+      return res.status(201).json({ request: await store.createMatchRequest(user.id, req.body || {}) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.post('/api/auth/register', async (req, res) => {
     try {
       const result = await store.register(String(req.body?.name || ''), String(req.body?.email || ''), String(req.body?.password || ''));
@@ -213,6 +238,22 @@ async function startServer() {
 
   app.get('/api/admin/session', (req, res) => {
     res.json({ authenticated: isAdmin(req), configured: Boolean(adminPassword) });
+  });
+
+  app.get('/api/admin/match-requests', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ requests: store.getMatchRequests() });
+  });
+
+  app.post('/api/admin/match-requests/:requestId/review', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const decision = req.body?.decision === 'approve' ? 'approve' : req.body?.decision === 'reject' ? 'reject' : null;
+      if (!decision) return res.status(400).json({ error: 'A review decision is required.' });
+      return res.json({ result: await store.reviewMatchRequest(req.params.requestId, decision, 'admin', String(req.body?.adminNote || '')) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
   });
 
   app.post('/api/admin/login', async (req, res) => {
