@@ -341,8 +341,12 @@ export class MatchStore {
       return { success: false, message: 'Match not found.' };
     }
 
-    if (match.status === 'ended') {
+    if (match.status === 'ended' || new Date(match.endTime).getTime() <= Date.now()) {
       return { success: false, message: 'This battle has already concluded.' };
+    }
+
+    if (new Date(match.startTime).getTime() > Date.now()) {
+      return { success: false, message: 'Voting opens when the scheduled battle starts.' };
     }
 
     const isFirstVote = !this.hasUserVoted(match.id);
@@ -464,7 +468,7 @@ export class MatchStore {
   static simulateRealtimeVotes() {
     let changed = false;
     this.matches.forEach((m) => {
-      if (m.status === 'active') {
+      if (m.status === 'active' && new Date(m.startTime).getTime() <= Date.now() && new Date(m.endTime).getTime() > Date.now()) {
         const rand = Math.random();
         // 75% chance of live action every 2.5s
         if (rand > 0.25) {
