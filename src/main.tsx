@@ -5,12 +5,17 @@ import './index.css';
 
 declare global {
   interface Window {
+    __RUNTIME_CONFIG__?: {
+      gaMeasurementId?: string;
+    };
     dataLayer: unknown[][];
     gtag: (...args: unknown[]) => void;
   }
 }
 
-const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
+const measurementId =
+  (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) ||
+  window.__RUNTIME_CONFIG__?.gaMeasurementId;
 
 if (measurementId) {
   const script = document.createElement('script');
