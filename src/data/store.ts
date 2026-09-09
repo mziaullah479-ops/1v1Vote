@@ -215,6 +215,47 @@ export class MatchStore {
     }
   }
 
+  private static async sendMatchMetric(matchId: string, metric: 'view' | 'share') {
+    if (!this.backendAvailable) await this.connectBackend();
+    if (!this.backendAvailable) return;
+    try {
+      const data = await this.backendRequest<{ match: Match }>(`/api/matches/${encodeURIComponent(matchId)}/${metric}`, {
+        method: 'POST',
+      });
+      this.applyBackendMatch(data.match);
+      this.notify(false);
+    } catch {
+      // Keep the local metric when the backend is temporarily unavailable.
+    }
+  }
+
+  static async recordView(matchId: string) {
+    if (typeof window === 'undefined') return;
+    const key = `vs_battle_viewed_v1:${matchId}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // Private browsing can disable session storage; the request can still continue.
+    }
+
+    const match = this.matches.find((item) => item.id === matchId || item.slug === matchId);
+    if (match) {
+      match.views = (match.views || 0) + 1;
+      this.notify();
+    }
+    void this.sendMatchMetric(matchId, 'view');
+  }
+
+  static async recordShare(matchId: string) {
+    const match = this.matches.find((item) => item.id === matchId || item.slug === matchId);
+    if (match) {
+      match.shares = (match.shares || 0) + 1;
+      this.notify();
+    }
+    void this.sendMatchMetric(matchId, 'share');
+  }
+
   static subscribe(fn: () => void) {
     this.listeners.push(fn);
     return () => {
