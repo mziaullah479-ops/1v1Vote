@@ -18,6 +18,7 @@ import { Footer } from './components/Footer';
 import { AdSensePlaceholder } from './components/AdSensePlaceholder';
 import { HomeHero } from './components/HomeHero';
 import { BattlePageHeader } from './components/BattlePageHeader';
+import { MatchRequestView } from './components/MatchRequestView';
 
 const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -57,8 +58,8 @@ function setCanonical(url: string) {
 export default function App() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
-  const [currentTab, setCurrentTab] = useState<'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'admin'>(
-    getRoutePath() === '/admin' ? 'admin' : 'home',
+  const [currentTab, setCurrentTab] = useState<'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'request' | 'admin'>(
+    getRoutePath() === '/admin' ? 'admin' : getRoutePath() === '/request' ? 'request' : 'home',
   );
   const [comments, setComments] = useState<Comment[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -120,6 +121,8 @@ export default function App() {
         }
       } else if (path === '/admin') {
         setCurrentTab('admin');
+      } else if (path === '/request') {
+        setCurrentTab('request');
       } else {
         setCurrentTab('home');
       }
@@ -154,6 +157,33 @@ export default function App() {
     setMeta('name', 'twitter:description', description);
     setMeta('name', 'twitter:image', image);
     setCanonical(url);
+
+    let structuredData = document.querySelector<HTMLScriptElement>('script[data-1v1vote-seo]');
+    if (!structuredData) {
+      structuredData = document.createElement('script');
+      structuredData.type = 'application/ld+json';
+      structuredData.dataset['1v1voteSeo'] = 'true';
+      document.head.appendChild(structuredData);
+    }
+    structuredData.textContent = JSON.stringify(battleMatch ? {
+      '@context': 'https://schema.org',
+      '@type': 'Event',
+      name: title,
+      description,
+      url,
+      startDate: battleMatch.startTime,
+      endDate: battleMatch.endTime,
+      eventStatus: battleMatch.status === 'ended' ? 'https://schema.org/EventCompleted' : 'https://schema.org/EventScheduled',
+      eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+      location: { '@type': 'VirtualLocation', url },
+      organizer: { '@type': 'Organization', name: '1v1Vote', url: `${window.location.origin}/` },
+    } : {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: '1v1Vote',
+      url,
+      description,
+    });
   }, [currentTab, currentMatch]);
 
   useEffect(() => {
@@ -280,6 +310,9 @@ export default function App() {
             setIsLeaderboardModalOpen(true);
           } else {
             setCurrentTab(tab);
+            if (tab === 'request' && getRoutePath() !== '/request') {
+              window.history.pushState(null, '', getPublicPath('/request'));
+            }
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
         }}
@@ -319,6 +352,17 @@ export default function App() {
                 selectedSlug={currentMatch?.slug}
               />
             </div>
+
+            <section className="mx-auto my-8 w-full max-w-6xl px-3 sm:px-6">
+              <div className="flex flex-col items-start justify-between gap-4 rounded-3xl border border-amber-500/25 bg-gradient-to-r from-amber-950/30 to-[#0b1324] p-5 sm:flex-row sm:items-center sm:p-6">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Own a creator matchup?</p>
+                  <h2 className="mt-1 text-xl font-black text-white">Submit a verified match request</h2>
+                  <p className="mt-1 text-xs text-slate-400">Payment، ownership proof اور schedule کے بعد admin publish کرے گا۔</p>
+                </div>
+                <button onClick={() => { setCurrentTab('request'); window.history.pushState(null, '', getPublicPath('/request')); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-amber-400">Request a Match</button>
+              </div>
+            </section>
 
             {/* Platform Feature Highlights */}
             <FeatureBar />
@@ -406,6 +450,10 @@ export default function App() {
           </div>
         )}
 
+        {currentTab === 'request' && (
+          <MatchRequestView user={user} onOpenAuth={() => setIsAuthModalOpen(true)} />
+        )}
+
         {currentTab === 'admin' && (
           <AdminGate
             matches={matches}
@@ -460,6 +508,9 @@ export default function App() {
           setIsLeaderboardModalOpen(true);
         } else {
           setCurrentTab(tab);
+          if (tab === 'request' && getRoutePath() !== '/request') {
+            window.history.pushState(null, '', getPublicPath('/request'));
+          }
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }} />

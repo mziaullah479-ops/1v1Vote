@@ -1,5 +1,7 @@
 export type Platform = 'YouTube' | 'TikTok' | 'Instagram' | 'Twitch';
 export type Region = 'Pakistan' | 'India' | 'USA' | 'Global';
+export type MatchRequestStatus = 'pending' | 'approved' | 'rejected';
+export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
 
 export interface Creator {
   id: string;
@@ -75,6 +77,30 @@ export interface UserProfile {
   votedMatchIds: { matchId: string; creatorId: string; timestamp: string }[];
   points: number;
   role?: 'user' | 'admin';
+  walletBalancePkr?: number;
+}
+
+export interface MatchRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+  status: MatchRequestStatus;
+  paymentStatus: PaymentStatus;
+  paymentReference: string;
+  paymentAmountPkr: number;
+  durationHours: number;
+  startTime: string;
+  endTime: string;
+  creator1: Creator;
+  creator2: Creator;
+  ownershipNote: string;
+  category: Platform;
+  region: Region;
+  description: string;
+  adminNote?: string;
+  reviewedAt?: string;
+  matchId?: string;
 }
 
 export interface LiveVoteEvent {
