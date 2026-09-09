@@ -1,0 +1,17 @@
+{
+  "name": "1v1Vote - Live Creator Battles",
+  "short_name": "1v1Vote",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070a13",
+  "theme_color": "#0ea5e9",
+  "description": "Vote in live creator battles and share the result.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
