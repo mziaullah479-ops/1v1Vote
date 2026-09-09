@@ -2,8 +2,9 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, UserProfile } from '../types';
+import { Comment, Match, MatchRequest, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES } from '../data/seedData';
+import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
 
 type Role = 'user' | 'admin';
 
@@ -14,6 +15,7 @@ interface StoredUser {
   passwordHash: string;
   role: Role;
   points: number;
+  walletBalancePkr: number;
   votedMatchIds: UserProfile['votedMatchIds'];
   createdAt: string;
 }
@@ -69,6 +71,7 @@ interface DatabaseState {
   commentLikes: StoredCommentLike[];
   adminSessions: StoredAdminSession[];
   audit: AuditEntry[];
+  matchRequests: MatchRequest[];
 }
 
 export class StoreError extends Error {
@@ -112,6 +115,58 @@ function sanitizeComment(text: string) {
   return result;
 }
 
+const SOCIAL_HOSTS = ['youtube.com', 'tiktok.com', 'instagram.com', 'twitch.tv'];
+
+function cleanSocialUrl(value: string) {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new StoreError('INVALID_PROFILE_URL', 'Each creator must have a valid social profile URL.');
+  }
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (url.protocol !== 'https:' || !SOCIAL_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`))) {
+    throw new StoreError('INVALID_PROFILE_URL', 'Only YouTube, TikTok, Instagram, and Twitch profile URLs are allowed.');
+  }
+  return url.toString();
+}
+
+function requestedCreator(input: unknown, fallbackColor: string): Match['creator1'] {
+  const value = (input || {}) as Partial<Match['creator1']>;
+  const name = String(value.name || '').trim().slice(0, 80);
+  if (name.length < 2) throw new StoreError('INVALID_CREATOR', 'Both creator names are required.');
+  const profileUrl = cleanSocialUrl(String(value.profileUrl || ''));
+  const hostname = new URL(profileUrl).hostname.toLowerCase();
+  const platform: Match['creator1']['platform'] = hostname.includes('tiktok')
+    ? 'TikTok'
+    : hostname.includes('instagram')
+      ? 'Instagram'
+      : hostname.includes('twitch')
+        ? 'Twitch'
+        : 'YouTube';
+  const region = ['Pakistan', 'India', 'USA', 'Global'].includes(String(value.region))
+    ? String(value.region) as Match['region']
+    : 'Global';
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return {
+    id: `requested-${randomUUID()}`,
+    name,
+    slug,
+    avatar: `https://unavatar.io/${platform.toLowerCase()}/${encodeURIComponent(name)}`,
+    subscribers: 'Pending verification',
+    subscriberCountRaw: 0,
+    platform,
+    region,
+    verified: false,
+    handle: `@${slug}`,
+    color: fallbackColor,
+    profileUrl,
+    followersCount: 'Pending verification',
+    growthRate: 'Pending verification',
+    growthTrend: 'neutral',
+  };
+}
+
 function emptyState(): DatabaseState {
   return {
     version: 1,
@@ -124,6 +179,7 @@ function emptyState(): DatabaseState {
     commentLikes: [],
     adminSessions: [],
     audit: [],
+    matchRequests: [],
   };
 }
 
@@ -147,6 +203,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     commentLikes: Array.isArray(input.commentLikes) ? input.commentLikes : [],
     adminSessions: Array.isArray(input.adminSessions) ? input.adminSessions : [],
     audit: Array.isArray(input.audit) ? input.audit : [],
+    matchRequests: Array.isArray(input.matchRequests) ? input.matchRequests : [],
   };
 }
 
@@ -263,6 +320,82 @@ export class PersistentStore {
     return this.state.matches.find((match) => match.id === idOrSlug || match.slug === idOrSlug);
   }
 
+  getMatchRequests(userId?: string) {
+    const requests = userId
+      ? this.state.matchRequests.filter((request) => request.userId === userId)
+      : this.state.matchRequests;
+    return clone(requests.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  }
+
+  async createMatchRequest(userId: string, input: Record<string, unknown>) {
+    const user = this.state.users.find((item) => item.id === userId);
+    if (!user) throw new StoreError('AUTH_REQUIRED', 'Please sign in before submitting a match request.', 401);
+    const durationHours = Number(input.durationHours);
+    const plan = MATCH_REQUEST_PLANS.find((item) => item.durationHours === durationHours);
+    if (!plan) throw new StoreError('INVALID_PLAN', 'Please choose a valid match duration.');
+    const startTime = new Date(String(input.startTime || '')).getTime();
+    if (!Number.isFinite(startTime) || startTime < Date.now() + 1000 * 60 * 60 * 24) {
+      throw new StoreError('INVALID_START_TIME', 'Scheduled matches must be submitted at least 24 hours in advance.');
+    }
+    const ownershipNote = String(input.ownershipNote || '').trim().slice(0, 600);
+    if (ownershipNote.length < 20) throw new StoreError('OWNERSHIP_PROOF_REQUIRED', 'Please explain how you will prove ownership of both social accounts.');
+    const paymentReference = String(input.paymentReference || '').trim().slice(0, 120);
+    if (paymentReference.length < 4) throw new StoreError('PAYMENT_REFERENCE_REQUIRED', 'Please enter the payment transaction reference.');
+    const creator1 = requestedCreator(input.creator1, '#38bdf8');
+    const creator2 = requestedCreator(input.creator2, '#fb923c');
+    if (creator1.profileUrl === creator2.profileUrl) throw new StoreError('DUPLICATE_PROFILE', 'The two creator profile URLs must be different.');
+    const request: MatchRequest = {
+      id: `request-${randomUUID()}`,
+      userId,
+      userName: user.name,
+      createdAt: nowIso(),
+      status: 'pending',
+      paymentStatus: 'submitted',
+      paymentReference,
+      paymentAmountPkr: plan.amountPkr,
+      durationHours: plan.durationHours,
+      startTime: new Date(startTime).toISOString(),
+      endTime: new Date(startTime + plan.durationHours * 60 * 60 * 1000).toISOString(),
+      creator1,
+      creator2,
+      ownershipNote,
+      category: creator1.platform,
+      region: creator1.region === creator2.region ? creator1.region : 'Global',
+      description: String(input.description || '').trim().slice(0, 500) || `${creator1.name} vs ${creator2.name} creator battle.`,
+    };
+    this.state.matchRequests.unshift(request);
+    await this.audit('match.requested', userId, { requestId: request.id, amountPkr: request.paymentAmountPkr });
+    await this.persist();
+    return clone(request);
+  }
+
+  async reviewMatchRequest(requestId: string, decision: 'approve' | 'reject', adminId: string, adminNote = '') {
+    const request = this.state.matchRequests.find((item) => item.id === requestId);
+    if (!request) throw new StoreError('REQUEST_NOT_FOUND', 'Match request not found.', 404);
+    if (request.status !== 'pending') throw new StoreError('REQUEST_ALREADY_REVIEWED', 'This match request has already been reviewed.', 409);
+    request.status = decision === 'approve' ? 'approved' : 'rejected';
+    request.paymentStatus = decision === 'approve' ? 'verified' : 'rejected';
+    request.adminNote = adminNote.trim().slice(0, 600) || undefined;
+    request.reviewedAt = nowIso();
+    let match: Match | undefined;
+    if (decision === 'approve') {
+      match = await this.createMatch({
+        creator1: { ...request.creator1, verified: true },
+        creator2: { ...request.creator2, verified: true },
+        startTime: request.startTime,
+        endTime: request.endTime,
+        category: request.category,
+        region: request.region,
+        description: request.description,
+        isTrending: false,
+      }, adminId);
+      request.matchId = match.id;
+    }
+    await this.audit(`match.request.${decision}d`, adminId, { requestId: request.id, matchId: match?.id });
+    await this.persist();
+    return { request: clone(request), match: match ? clone(match) : undefined };
+  }
+
   getUserBySession(token: string | undefined) {
     if (!token) return undefined;
     this.pruneExpiredSessions();
@@ -285,6 +418,7 @@ export class PersistentStore {
       votedMatchIds: clone(user.votedMatchIds),
       points: user.points,
       role: user.role,
+      walletBalancePkr: user.walletBalancePkr || 0,
     };
   }
 
@@ -305,6 +439,7 @@ export class PersistentStore {
       passwordHash: passwordHash(password),
       role: 'user',
       points: 0,
+      walletBalancePkr: 0,
       votedMatchIds: [],
       createdAt: nowIso(),
     };
@@ -354,6 +489,12 @@ export class PersistentStore {
     const match = this.getMatch(matchId);
     if (!match) throw new StoreError('MATCH_NOT_FOUND', 'Match not found.', 404);
     if (match.status !== 'active') throw new StoreError('MATCH_ENDED', 'This battle has already concluded.', 409);
+    if (new Date(match.startTime).getTime() > Date.now()) throw new StoreError('MATCH_NOT_STARTED', 'Voting opens when the scheduled battle starts.', 409);
+    if (new Date(match.endTime).getTime() <= Date.now()) {
+      match.status = 'ended';
+      await this.persist();
+      throw new StoreError('MATCH_ENDED', 'This battle has already concluded.', 409);
+    }
     if (![match.creator1.id, match.creator2.id].includes(creatorId)) {
       throw new StoreError('INVALID_CREATOR', 'Invalid creator selected.');
     }
