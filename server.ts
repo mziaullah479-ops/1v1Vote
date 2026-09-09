@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import cookieParser from 'cookie-parser';
@@ -293,8 +294,16 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    const indexPath = path.join(distPath, 'index.html');
+    app.use(express.static(distPath, { index: false }));
+    app.get('*', (_req, res) => {
+      const measurementId = process.env.VITE_GA_MEASUREMENT_ID?.trim();
+      const runtimeConfig = JSON.stringify({ gaMeasurementId: measurementId || undefined });
+      const html = fs
+        .readFileSync(indexPath, 'utf8')
+        .replace('</head>', '<script>window.__RUNTIME_CONFIG__=' + runtimeConfig + ';</script></head>');
+      return res.type('html').send(html);
+    });
   }
 
   server = app.listen(port, '0.0.0.0', () => {
