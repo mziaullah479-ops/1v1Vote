@@ -219,7 +219,7 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
                   <div className="text-white font-extrabold text-sm leading-none font-mono">
                     {likes1.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-slate-400">Unlimited Fan Likes</div>
+                  <div className="text-[10px] text-slate-400">Fan Reactions</div>
                 </div>
               </div>
 
@@ -400,7 +400,7 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
                   <div className="text-white font-extrabold text-sm leading-none font-mono">
                     {likes2.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-slate-400">Unlimited Fan Likes</div>
+                  <div className="text-[10px] text-slate-400">Fan Reactions</div>
                 </div>
               </div>
 
