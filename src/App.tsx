@@ -412,6 +412,7 @@ export default function App() {
 
             {/* In-Content Billboard Ad Placement */}
             <AdSensePlaceholder slotType="in-content" />
+            <AdSensePlaceholder slotType="sidebar" className="my-0 px-0 hidden lg:block" />
 
             {/* 5. Live Comments Section with Fandom Allegiance */}
             <CommentsSection
