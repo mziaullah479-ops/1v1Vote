@@ -18,9 +18,9 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   onExploreClick,
 }) => {
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 pt-4 pb-2">
+    <div className="home-hero-shell w-full max-w-6xl mx-auto px-3 sm:px-4 pt-4 pb-2">
       {/* Hero Container */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#0c152c] via-[#091022] to-[#070b16] border border-sky-500/30 p-6 sm:p-10 shadow-[0_0_50px_rgba(56,189,248,0.12)]">
+      <div className="home-hero-card relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#0c152c] via-[#091022] to-[#070b16] border border-sky-500/30 p-6 sm:p-10 shadow-[0_0_50px_rgba(56,189,248,0.12)]">
         {/* Glow ambient spots */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none translate-y-1/2"></div>
@@ -46,7 +46,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
           </p>
 
           {/* Quick Metrics Strip */}
-          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 my-6 text-xs text-slate-400 bg-slate-900/60 border border-slate-800/80 px-5 py-2.5 rounded-2xl">
+          <div className="home-hero-metrics flex flex-wrap items-center justify-center gap-4 sm:gap-8 my-6 text-xs text-slate-400 bg-slate-900/60 border border-slate-800/80 px-5 py-2.5 rounded-2xl">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
               <span className="text-white font-bold text-sm">{totalBattles}</span>
@@ -67,17 +67,23 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
           {/* Featured Match Quick Bar (if available) */}
           {featuredMatch && (
-            <div className="w-full max-w-xl bg-gradient-to-r from-sky-950/70 via-[#0a1428] to-orange-950/70 border border-slate-700/80 rounded-2xl p-3.5 sm:p-4 mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+            <div className="home-hero-featured w-full max-w-xl bg-gradient-to-r from-sky-950/70 via-[#0a1428] to-orange-950/70 border border-slate-700/80 rounded-2xl p-3.5 sm:p-4 mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex -space-x-3">
                   <img
                     src={featuredMatch.creator1.avatar}
                     alt={featuredMatch.creator1.name}
+                    width={44}
+                    height={44}
+                    decoding="async"
                     className="w-11 h-11 rounded-full object-cover border-2 border-sky-400 shadow"
                   />
                   <img
                     src={featuredMatch.creator2.avatar}
                     alt={featuredMatch.creator2.name}
+                    width={44}
+                    height={44}
+                    decoding="async"
                     className="w-11 h-11 rounded-full object-cover border-2 border-orange-400 shadow"
                   />
                 </div>
