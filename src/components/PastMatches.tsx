@@ -13,7 +13,7 @@ export const PastMatches: React.FC<PastMatchesProps> = ({ matches, onSelectMatch
   if (endedMatches.length === 0) return null;
 
   return (
-    <section className="below-fold-section w-full max-w-6xl mx-auto my-12 px-2 sm:px-4">
+    <section className="w-full max-w-6xl mx-auto my-12 px-2 sm:px-4">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider mb-1">
