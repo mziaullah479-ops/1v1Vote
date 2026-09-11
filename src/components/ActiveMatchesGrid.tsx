@@ -40,9 +40,9 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
   const isUpcoming = (match: Match) => new Date(match.startTime).getTime() > Date.now();
 
   return (
-    <section id="active-matches-section" className="w-full max-w-6xl mx-auto my-10 px-2 sm:px-4">
+    <section id="active-matches-section" className="mobile-match-section w-full max-w-6xl mx-auto my-10 px-2 sm:px-4">
       {/* Section Header & Filters */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+      <div className="mobile-match-header flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1 text-sky-400 font-bold text-xs uppercase tracking-wider">
             <Flame className="w-4 h-4 fill-current text-sky-400" />
@@ -54,7 +54,7 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="mobile-filter-bar flex flex-wrap items-center gap-2">
           {/* Platform Filter */}
           <div className="flex items-center gap-1 bg-[#0a1224] p-1 rounded-xl border border-slate-800 text-xs">
             <span className="text-slate-500 text-[10px] uppercase font-bold px-2 flex items-center gap-1">
