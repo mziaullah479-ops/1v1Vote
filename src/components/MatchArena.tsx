@@ -171,6 +171,9 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
                   <img
                     src={match.creator1.avatar}
                     alt={match.creator1.name}
+                    width={112}
+                    height={112}
+                    decoding="async"
                     className="w-full h-full object-cover rounded-full bg-slate-900"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/micah/svg?seed=${match.creator1.slug}`;
@@ -352,6 +355,9 @@ export const MatchArena: React.FC<MatchArenaProps> = ({
                   <img
                     src={match.creator2.avatar}
                     alt={match.creator2.name}
+                    width={112}
+                    height={112}
+                    decoding="async"
                     className="w-full h-full object-cover rounded-full bg-slate-900"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/micah/svg?seed=${match.creator2.slug}`;
