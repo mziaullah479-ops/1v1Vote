@@ -71,6 +71,7 @@ export default function App() {
   
   // Toast notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const analyticsPageKey = currentTab === 'battle' ? currentMatch?.slug : currentTab;
 
   // Sync state from store
   const syncStoreData = useCallback(() => {
@@ -138,13 +139,24 @@ export default function App() {
   // Keep search and social previews aligned with the battle URL.
   useEffect(() => {
     const battleMatch = currentTab === 'battle' ? currentMatch : null;
+    const routePath = getRoutePath();
+    if (routePath.startsWith('/vs/') && !battleMatch) return;
+    const requestPage = currentTab === 'request' || routePath === '/request';
     const title = battleMatch
       ? `${battleMatch.creator1.name} vs ${battleMatch.creator2.name} - 1v1Vote Live Arena`
-      : '1v1Vote - Live Creator Battles & Matchup Voting';
+      : requestPage
+        ? 'Request a Creator Match - 1v1Vote'
+        : '1v1Vote - Live Creator Battles & Matchup Voting';
     const description = battleMatch
       ? `Vote in the live 1v1 battle between ${battleMatch.creator1.name} and ${battleMatch.creator2.name}. Share the result and follow the live vote swing.`
-      : '1v1Vote: Live head-to-head voting battles between top creators. Vote, share, and decide who rules the arena.';
-    const url = battleMatch ? `${window.location.origin}/vs/${battleMatch.slug}` : `${window.location.origin}/`;
+      : requestPage
+        ? 'Submit a verified creator matchup request for review on 1v1Vote.'
+        : '1v1Vote: Live head-to-head voting battles between top creators. Vote, share, and decide who rules the arena.';
+    const url = battleMatch
+      ? `${window.location.origin}/vs/${battleMatch.slug}`
+      : requestPage
+        ? `${window.location.origin}/request`
+        : `${window.location.origin}/`;
     const image = `${window.location.origin}/og-image.svg`;
 
     document.title = title;
@@ -184,7 +196,15 @@ export default function App() {
       url,
       description,
     });
-  }, [currentTab, currentMatch]);
+
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'page_view', {
+        page_title: title,
+        page_location: url,
+        page_path: new URL(url).pathname,
+      });
+    }
+  }, [analyticsPageKey]);
 
   useEffect(() => {
     if (currentTab === 'battle' && currentMatch) {
@@ -223,6 +243,12 @@ export default function App() {
     const res = MatchStore.vote(currentMatch.id, creatorId);
     if (res.success) {
       setToastMessage(res.message);
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', 'vote', {
+          match_id: currentMatch.id,
+          creator_id: creatorId,
+        });
+      }
     } else {
       setToastMessage(res.message);
     }
@@ -345,7 +371,7 @@ export default function App() {
             />
 
             {/* All Active Influencer Battles Grid - Central Hub */}
-            <div id="active-matches-section">
+            <div>
               <ActiveMatchesGrid
                 matches={matches}
                 onSelectMatch={handleSelectMatch}
