@@ -144,10 +144,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 />
               </div>
             ) : (
-              <button
-                id="btn-search-toggle"
-                onClick={() => setShowSearchInput(true)}
-                className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
+                <button
+                  id="btn-search-toggle"
+                  onClick={() => setShowSearchInput(true)}
+                  aria-label="Search creators"
+                  className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
                 title="Search creators"
               >
                 <Search className="w-4 h-4" />
@@ -158,17 +159,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* User Sign In / Profile */}
           {user ? (
             <div className="flex items-center gap-2 bg-[#0e1628] border border-slate-700/80 rounded-full pl-2 pr-2.5 py-1">
-              <img
-                src={user.avatar}
-                alt={user.name}
-                className="w-6 h-6 rounded-full border border-cyan-400/50 bg-slate-800"
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  width={24}
+                  height={24}
+                  decoding="async"
+                  className="w-6 h-6 rounded-full border border-cyan-400/50 bg-slate-800"
               />
               <span className="text-xs font-medium text-slate-200 max-w-[80px] truncate hidden sm:inline">
                 {user.name}
               </span>
-              <button
-                onClick={onLogout}
-                className="text-slate-400 hover:text-rose-400 ml-0.5 transition-colors"
+                <button
+                  onClick={onLogout}
+                  aria-label="Sign out"
+                  className="text-slate-400 hover:text-rose-400 ml-0.5 transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-3.5 h-3.5" />
