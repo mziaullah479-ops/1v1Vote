@@ -156,6 +156,10 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                   <img
                     src={c.authorAvatar}
                     alt={c.authorName}
+                    width={36}
+                    height={36}
+                    loading="lazy"
+                    decoding="async"
                     className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 shrink-0"
                   />
 
