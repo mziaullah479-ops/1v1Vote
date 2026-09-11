@@ -13,7 +13,7 @@ export const PastMatches: React.FC<PastMatchesProps> = ({ matches, onSelectMatch
   if (endedMatches.length === 0) return null;
 
   return (
-    <section className="w-full max-w-6xl mx-auto my-12 px-2 sm:px-4">
+    <section className="below-fold-section w-full max-w-6xl mx-auto my-12 px-2 sm:px-4">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider mb-1">
@@ -60,6 +60,10 @@ export const PastMatches: React.FC<PastMatchesProps> = ({ matches, onSelectMatch
                     <img
                       src={m.creator1.avatar}
                       alt={m.creator1.name}
+                      width={48}
+                      height={48}
+                      loading="lazy"
+                      decoding="async"
                       className="w-12 h-12 rounded-full object-cover bg-slate-800"
                     />
                     {winnerIsC1 && (
@@ -92,6 +96,10 @@ export const PastMatches: React.FC<PastMatchesProps> = ({ matches, onSelectMatch
                     <img
                       src={m.creator2.avatar}
                       alt={m.creator2.name}
+                      width={48}
+                      height={48}
+                      loading="lazy"
+                      decoding="async"
                       className="w-12 h-12 rounded-full object-cover bg-slate-800"
                     />
                     {!winnerIsC1 && (
