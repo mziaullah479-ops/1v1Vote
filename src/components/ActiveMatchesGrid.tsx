@@ -141,6 +141,10 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
                       <img
                         src={m.creator1.avatar}
                         alt={m.creator1.name}
+                        width={64}
+                        height={64}
+                        loading="lazy"
+                        decoding="async"
                         className="w-16 h-16 rounded-full object-cover border-2 border-sky-500/80 p-0.5 bg-slate-900 shadow-md group-hover:scale-105 transition-transform"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/micah/svg?seed=${m.creator1.slug}`;
@@ -178,6 +182,10 @@ export const ActiveMatchesGrid: React.FC<ActiveMatchesGridProps> = ({
                       <img
                         src={m.creator2.avatar}
                         alt={m.creator2.name}
+                        width={64}
+                        height={64}
+                        loading="lazy"
+                        decoding="async"
                         className="w-16 h-16 rounded-full object-cover border-2 border-orange-500/80 p-0.5 bg-slate-900 shadow-md group-hover:scale-105 transition-transform"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/micah/svg?seed=${m.creator2.slug}`;
