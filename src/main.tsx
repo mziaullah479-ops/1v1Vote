@@ -38,7 +38,8 @@ if (measurementId) {
     window.dataLayer.push(args);
   };
   window.gtag('js', new Date());
-  window.gtag('config', measurementId, { anonymize_ip: true });
+  // Route changes are tracked by App so SPA navigation does not lose page views.
+  window.gtag('config', measurementId, { anonymize_ip: true, send_page_view: false });
 }
 
 if (gtmId) {
