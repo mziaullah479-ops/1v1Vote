@@ -63,6 +63,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
               <img
                 src={currentUser.avatar}
                 alt={currentUser.name}
+                width={40}
+                height={40}
+                loading="lazy"
+                decoding="async"
                 className="w-10 h-10 rounded-full border border-sky-400"
               />
               <div>
