@@ -65,9 +65,10 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </div>
           </div>
 
-          {/* Featured Match Quick Bar (if available) */}
-          {featuredMatch && (
-            <div className="home-hero-featured w-full max-w-xl bg-gradient-to-r from-sky-950/70 via-[#0a1428] to-orange-950/70 border border-slate-700/80 rounded-2xl p-3.5 sm:p-4 mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          {/* Reserve the featured slot so backend data cannot shift the page. */}
+          <div className="home-hero-featured-slot w-full max-w-xl mt-2 min-h-[126px] sm:min-h-[78px]">
+            {featuredMatch && (
+              <div className="home-hero-featured w-full bg-gradient-to-r from-sky-950/70 via-[#0a1428] to-orange-950/70 border border-slate-700/80 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex -space-x-3">
                   <img
@@ -113,8 +114,9 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   <span>All Battles</span>
                 </button>
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
