@@ -36,6 +36,55 @@ function cookieOptions(maxAge: number) {
   };
 }
 
+function siteOrigin() {
+  return (process.env.FRONTEND_ORIGIN?.split(',')[0]?.trim() || 'https://1v1vote.com').replace(/\/$/, '');
+}
+
+function escapeHtml(value: string) {
+  const entities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '\"': '&quot;',
+    "'": '&#39;',
+  };
+  return value.replace(/[&<>\"']/g, (character) => entities[character] || character);
+}
+
+function escapeXml(value: string) {
+  return escapeHtml(value);
+}
+
+function replaceMeta(html: string, attribute: 'name' | 'property', key: string, content: string) {
+  const pattern = new RegExp(`(<meta\\s+${attribute}=\"${key}\"\\s+content=\")[^\"]*(\")`, 'i');
+  return html.replace(pattern, (_match, prefix: string, suffix: string) => `${prefix}${escapeHtml(content)}${suffix}`);
+}
+
+function applyServerSeo(html: string, pathname: string, match?: import('./src/types').Match) {
+  const origin = siteOrigin();
+  const url = `${origin}${pathname === '/' ? '/' : pathname}`;
+  const title = match
+    ? `${match.creator1.name} vs ${match.creator2.name} - 1v1Vote Live Arena`
+    : pathname === '/request'
+      ? 'Request a Creator Match - 1v1Vote'
+      : '1v1Vote - Live Creator Battles & Matchup Voting';
+  const description = match
+    ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
+    : pathname === '/request'
+      ? 'Submit a verified creator matchup request for review on 1v1Vote.'
+      : '1v1Vote: Live head-to-head voting battles between top creators. Vote, share, and decide who rules the arena.';
+
+  let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+  result = replaceMeta(result, 'name', 'description', description);
+  result = replaceMeta(result, 'property', 'og:title', title);
+  result = replaceMeta(result, 'property', 'og:description', description);
+  result = replaceMeta(result, 'property', 'og:url', url);
+  result = replaceMeta(result, 'name', 'twitter:title', title);
+  result = replaceMeta(result, 'name', 'twitter:description', description);
+  result = result.replace(/<link rel=\"canonical\" href=\"[^\"]*\"\s*\/>/i, `<link rel=\"canonical\" href=\"${escapeHtml(url)}\" />`);
+  return result;
+}
+
 async function startServer() {
   const app = express();
   const port = Number(process.env.PORT || 3000);
@@ -329,6 +378,12 @@ async function startServer() {
     }
   });
 
+  app.get('/sitemap.xml', (_req, res) => {
+    const paths = new Set(['/', '/request', ...store.getSnapshot().matches.map((match) => `/vs/${match.slug}`)]);
+    const urls = [...paths].map((pathname) => `<url><loc>${escapeXml(`${siteOrigin()}${pathname}`)}</loc></url>`).join('');
+    return res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
+  });
+
   app.post('/api/detect-social', async (req, res) => {
     const targetUrl = (req.body?.url as string) || '';
     const nameHint = (req.body?.name as string) || undefined;
@@ -353,7 +408,7 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     const indexPath = path.join(distPath, 'index.html');
     app.use(express.static(distPath, { index: false }));
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res) => {
       const measurementId = process.env.VITE_GA_MEASUREMENT_ID?.trim();
       const runtimeConfig = JSON.stringify({
         gaMeasurementId: measurementId || undefined,
@@ -366,8 +421,16 @@ async function startServer() {
           'footer-banner': process.env.VITE_ADSENSE_SLOT_FOOTER_BANNER?.trim() || undefined,
         },
       });
-      const html = fs
-        .readFileSync(indexPath, 'utf8')
+      const requestedPath = req.path || '/';
+      let match: import('./src/types').Match | undefined;
+      if (requestedPath.startsWith('/vs/')) {
+        try {
+          match = store.getMatch(decodeURIComponent(requestedPath.slice('/vs/'.length)));
+        } catch {
+          match = undefined;
+        }
+      }
+      const html = applyServerSeo(fs.readFileSync(indexPath, 'utf8'), requestedPath, match)
         .replace('</head>', `<script>window.__RUNTIME_CONFIG__=${runtimeConfig};</script></head>`);
       return res.type('html').send(html);
     });
