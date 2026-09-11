@@ -56,7 +56,10 @@ function setCanonical(url: string) {
 }
 
 export default function App() {
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [matches, setMatches] = useState<Match[]>(() => {
+    MatchStore.init();
+    return [...MatchStore.getMatches()];
+  });
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
   const [currentTab, setCurrentTab] = useState<'home' | 'battle' | 'battles' | 'leaderboard' | 'about' | 'request' | 'admin'>(
     getRoutePath() === '/admin' ? 'admin' : getRoutePath() === '/request' ? 'request' : 'home',
