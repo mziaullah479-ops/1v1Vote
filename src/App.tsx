@@ -350,7 +350,7 @@ export default function App() {
 
       {/* Top Header Ad Placement (AdSense Slot) */}
       <div className="pt-2">
-        <AdSensePlaceholder slotType="header-banner" />
+         <AdSensePlaceholder slotType="header-banner" className="header-ad-slot" />
       </div>
 
       {/* Main Content Area */}
