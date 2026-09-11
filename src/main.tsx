@@ -27,12 +27,19 @@ const adsenseClientId =
   (import.meta.env.VITE_ADSENSE_CLIENT_ID as string | undefined) ||
   window.__RUNTIME_CONFIG__?.adsenseClientId;
 
-if (measurementId) {
+function loadExternalScript(src: string, crossOrigin?: string) {
   const script = document.createElement('script');
   script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+  if (crossOrigin) script.crossOrigin = crossOrigin;
+  script.src = src;
   document.head.appendChild(script);
+}
 
+function deferThirdPartyWork(work: () => void) {
+  window.setTimeout(work, 2000);
+}
+
+if (measurementId) {
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag(...args: unknown[]) {
     window.dataLayer.push(args);
@@ -40,23 +47,26 @@ if (measurementId) {
   window.gtag('js', new Date());
   // Route changes are tracked by App so SPA navigation does not lose page views.
   window.gtag('config', measurementId, { anonymize_ip: true, send_page_view: false });
+  deferThirdPartyWork(() => {
+    loadExternalScript(`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`);
+  });
 }
 
 if (gtmId) {
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(gtmId)}`;
-  document.head.appendChild(script);
+  deferThirdPartyWork(() => {
+    loadExternalScript(`https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(gtmId)}`);
+  });
 }
 
 if (adsenseClientId) {
-  const script = document.createElement('script');
-  script.async = true;
-  script.crossOrigin = 'anonymous';
-  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(adsenseClientId)}`;
-  document.head.appendChild(script);
+  deferThirdPartyWork(() => {
+    loadExternalScript(
+      `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(adsenseClientId)}`,
+      'anonymous',
+    );
+  });
 }
 
 createRoot(document.getElementById('root')!).render(
