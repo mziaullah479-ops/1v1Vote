@@ -75,25 +75,43 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/international-stars': 'International Public Figures', '/vote-guide': '1v1Vote Voting Guide',
     '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map',
   };
+  const titleOverrides: Record<string, string> = {
+    '/about': 'About 1v1Vote - Public Opinion Rankings',
+    '/how-it-works': 'How 1v1Vote Works - Daily Public Figure Voting',
+    '/faq': '1v1Vote FAQ - Public Figure Voting Questions',
+    '/contact': 'Contact 1v1Vote - Profile Corrections',
+    '/request': 'Request a Profile Review - 1v1Vote',
+    '/vote-guide': '1v1Vote Voting Guide',
+    '/site-map': '1v1Vote Site Map',
+  };
+  const descriptionOverrides: Record<string, string> = {
+    '/about': 'Learn how 1v1Vote ranks public figures through transparent daily voting.',
+    '/how-it-works': 'Understand the 1v1Vote daily voting and ranking system.',
+    '/faq': 'Answers to common questions about 1v1Vote voting, rankings, and profiles.',
+    '/contact': 'Contact 1v1Vote about profile corrections and source information.',
+    '/request': 'Request a correction or profile review for the 1v1Vote directory.',
+    '/vote-guide': 'A clear guide to voting, cooldowns, rankings, and profile pages.',
+    '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
+  };
   const title = person
     ? `${person.name} Vote Ranking - 1v1Vote`
     : match
     ? `${match.creator1.name} vs ${match.creator2.name} - 1v1Vote Live Arena`
-    : pathname === '/request'
-      ? 'Request a Creator Match - 1v1Vote'
+    : titleOverrides[pathname]
+      ? titleOverrides[pathname]
       : staticTitles[pathname]
         ? `${staticTitles[pathname]} - 1v1Vote`
-        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Public Figure Rankings & Daily Voting';
+        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Vote. Rank. Win.';
   const description = person
     ? `Read about ${person.name}, view the source profile, and vote in the live 1v1Vote ranking.`
     : match
     ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
-    : pathname === '/request'
-      ? 'Submit a verified creator matchup request for review on 1v1Vote.'
+    : descriptionOverrides[pathname]
+      ? descriptionOverrides[pathname]
       : staticTitles[pathname]
         ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
-      : 'Vote every 24 hours for public figures, leaders, scholars, athletes, artists, and entrepreneurs. No login required.';
-
+      : 'Vote once every 24 hours for important public figures, leaders, scholars, athletes, and entertainers.';
+  
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
   result = replaceMeta(result, 'property', 'og:title', title);
