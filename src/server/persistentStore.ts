@@ -2,9 +2,10 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, MatchRequest, UserProfile } from '../types';
-import { INITIAL_COMMENTS, INITIAL_MATCHES } from '../data/seedData';
+import { Comment, Match, MatchRequest, Person, UserProfile } from '../types';
+import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
+import { scrapeSocialProfile } from './socialScraper';
 
 type Role = 'user' | 'admin';
 
@@ -47,6 +48,12 @@ interface StoredCommentLike {
   createdAt: string;
 }
 
+interface StoredPersonVote {
+  personId: string;
+  identityKey: string;
+  createdAt: string;
+}
+
 interface StoredAdminSession {
   tokenHash: string;
   expiresAt: number;
@@ -61,12 +68,14 @@ interface AuditEntry {
 }
 
 interface DatabaseState {
-  version: 1;
+  version: 2;
   matches: Match[];
+  people: Person[];
   comments: Record<string, Comment[]>;
   users: StoredUser[];
   sessions: StoredSession[];
   votes: StoredVote[];
+  personVotes: StoredPersonVote[];
   likes: StoredLike[];
   commentLikes: StoredCommentLike[];
   adminSessions: StoredAdminSession[];
@@ -75,7 +84,7 @@ interface DatabaseState {
 }
 
 export class StoreError extends Error {
-  constructor(public code: string, message: string, public status = 400) {
+  constructor(public code: string, message: string, public status = 400, public retryAt?: string) {
     super(message);
   }
 }
@@ -169,12 +178,14 @@ function requestedCreator(input: unknown, fallbackColor: string): Match['creator
 
 function emptyState(): DatabaseState {
   return {
-    version: 1,
+    version: 2,
     matches: clone(INITIAL_MATCHES),
+    people: clone(INITIAL_PEOPLE),
     comments: clone(INITIAL_COMMENTS),
     users: [],
     sessions: [],
     votes: [],
+    personVotes: [],
     likes: [],
     commentLikes: [],
     adminSessions: [],
@@ -186,19 +197,28 @@ function emptyState(): DatabaseState {
 function normalizeState(input: Partial<DatabaseState>): DatabaseState {
   const seeded = emptyState();
   const storedMatches = Array.isArray(input.matches) ? input.matches : [];
+  const storedPeople = Array.isArray(input.people) ? input.people : [];
   const mergedMatches = storedMatches.length
     ? [
         ...storedMatches,
         ...seeded.matches.filter((seed) => !storedMatches.some((match) => match.id === seed.id || match.slug === seed.slug)),
       ]
     : seeded.matches;
+  const mergedPeople = storedPeople.length
+    ? [
+        ...storedPeople,
+        ...seeded.people.filter((seed) => !storedPeople.some((person) => person.id === seed.id || person.slug === seed.slug)),
+      ]
+    : seeded.people;
   return {
-    version: 1,
+    version: 2,
     matches: mergedMatches.map((match) => ({ ...match, views: match.views || 0, shares: match.shares || 0 })),
+    people: mergedPeople.map((person) => ({ ...person, votes: person.votes || 0, shares: person.shares || 0, updatedAt: person.updatedAt || nowIso() })),
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
     votes: Array.isArray(input.votes) ? input.votes : [],
+    personVotes: Array.isArray(input.personVotes) ? input.personVotes : [],
     likes: Array.isArray(input.likes) ? input.likes : [],
     commentLikes: Array.isArray(input.commentLikes) ? input.commentLikes : [],
     adminSessions: Array.isArray(input.adminSessions) ? input.adminSessions : [],
@@ -314,6 +334,76 @@ export class PersistentStore {
         trendingMatchSlug: active[0]?.slug || this.state.matches[0]?.slug || '',
       },
     };
+  }
+
+  getPeopleSnapshot() {
+    return clone(this.state.people).sort((left, right) => {
+      if (right.votes !== left.votes) return right.votes - left.votes;
+      if (right.shares !== left.shares) return right.shares - left.shares;
+      return left.name.localeCompare(right.name);
+    });
+  }
+
+  getPerson(idOrSlug: string) {
+    return this.state.people.find((person) => person.id === idOrSlug || person.slug === idOrSlug);
+  }
+
+  async voteForPerson(personId: string, identityKey: string) {
+    const person = this.getPerson(personId);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const recentVote = this.state.personVotes.find((vote) =>
+      vote.personId === person.id && vote.identityKey === identityKey && new Date(vote.createdAt).getTime() > cutoff,
+    );
+    if (recentVote) {
+      const retryAt = new Date(new Date(recentVote.createdAt).getTime() + 24 * 60 * 60 * 1000).toISOString();
+      throw new StoreError('VOTE_COOLDOWN', `You can vote for ${person.name} again after 24 hours.`, 429, retryAt);
+    }
+
+    const now = nowIso();
+    person.votes += 1;
+    person.updatedAt = now;
+    this.state.personVotes = [
+      ...this.state.personVotes.filter((vote) => new Date(vote.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000),
+      { personId: person.id, identityKey, createdAt: now },
+    ];
+    await this.audit('person_vote', undefined, { personId: person.id });
+    await this.persist();
+    return clone(person);
+  }
+
+  async sharePerson(personId: string) {
+    const person = this.getPerson(personId);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+    person.shares += 1;
+    person.updatedAt = nowIso();
+    await this.audit('person_share', undefined, { personId: person.id });
+    await this.persist();
+    return clone(person);
+  }
+
+  async refreshPeopleProfiles() {
+    let refreshed = 0;
+    for (const person of this.state.people) {
+      if (!person.researchUrl) continue;
+      try {
+        const result = await scrapeSocialProfile(person.researchUrl, person.name);
+        person.name = result.name || person.name;
+        person.avatar = result.avatarUrl || person.avatar;
+        person.profileUrl = result.profileUrl || person.profileUrl;
+        person.platform = result.platform;
+        person.followersCount = result.followersCount || person.followersCount;
+        person.subscriberCountRaw = result.subscriberCountRaw || person.subscriberCountRaw;
+        person.lastResearchedAt = nowIso();
+        person.updatedAt = nowIso();
+        refreshed += 1;
+      } catch (error) {
+        console.error(`Profile refresh failed for ${person.slug}`, error);
+      }
+    }
+    if (refreshed > 0) await this.persist();
+    return refreshed;
   }
 
   getMatch(idOrSlug: string) {
