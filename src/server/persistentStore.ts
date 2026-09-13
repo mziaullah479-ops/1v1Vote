@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, MatchRequest, Person, PeopleAutomationStatus, UserProfile } from '../types';
+import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
 import { scrapeSocialProfile } from './socialScraper';
@@ -96,10 +96,14 @@ interface DiscoveryCandidate {
   popularity?: number;
 }
 
+const DATABASE_VERSION = 4;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971',
 ]);
+const ARCHIVED_PERSON_SLUGS = new Set(['ducky-bhai', 'junaid-akram', 'irfan-junejo', 'mrbeast', 'ishowspeed']);
+const PERSON_CATEGORIES: PersonCategory[] = ['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business'];
+const PERSON_COUNTRIES: PersonCountry[] = ['Pakistan', 'India', 'USA', 'Global'];
 
 export class StoreError extends Error {
   constructor(public code: string, message: string, public status = 400, public retryAt?: string) {
@@ -156,6 +160,14 @@ function profileSlug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 80);
 }
 
+function isPlaceholderAvatar(value: string | undefined) {
+  return !value || /ui-avatars\.com|dicebear|unavatar\.io|images\.unsplash\.com/i.test(value);
+}
+
+function shouldArchivePerson(person: Person) {
+  return ARCHIVED_PERSON_SLUGS.has(person.slug) || AUTO_PROFILE_BLOCKLIST.has(person.slug) || person.category === 'Creator' || (person.platform === 'YouTube' && !person.archivedAt);
+}
+
 function looksLikePersonPage(name: string, bio: string) {
   if (AUTO_PROFILE_BLOCKLIST.has(profileSlug(name))) return false;
   if (/relations?|war|conflict|history|election|treaty|attack|incident|movement|organization|company|collective|band|film|album|song|tournament|championship|season|district|province|country|university|government/i.test(name)) return false;
@@ -168,7 +180,7 @@ async function discoverWithGemini(apiKey: string, existingNames: string[]) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `Find up to five notable public figures who are not in this existing list: ${existingNames.join(', ')}. Use a balanced mix of Pakistan and global public figures, creators, religious scholars, politicians, athletes, entertainers, and business leaders. Use Google Search grounding when available. Only include people with a reliable public profile page and a real public image source. Do not invent identities, URLs, roles, or current offices. Return only a JSON array with objects containing name, category, country, shortBio, bio, profileUrl, and platform. Categories must be Public Figure, Religious Scholar, Politics, Creator, Sports, Entertainment, or Business. Countries must be Pakistan, India, USA, or Global. Keep shortBio under 180 characters and bio under 600 characters.` }] }],
+      contents: [{ parts: [{ text: `Find up to five notable public figures who are not in this existing list: ${existingNames.join(', ')}. Use a balanced mix of Pakistan and global public figures, religious scholars, politicians, athletes, entertainers, and business leaders. Do not return YouTube channels, social handles, organizations, events, or generic article pages. Use Google Search grounding when available. Only include people with a reliable public profile page and a real public image source. Do not invent identities, URLs, roles, or current offices. Return only a JSON array with objects containing name, category, country, shortBio, bio, profileUrl, and platform. Categories must be Public Figure, Religious Scholar, Politics, Sports, Entertainment, or Business. Countries must be Pakistan, India, USA, or Global. Keep shortBio under 180 characters and bio under 600 characters.` }] }],
       tools: [{ google_search: {} }],
       generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
     }),
@@ -186,7 +198,7 @@ async function discoverFromWikipedia(existingNames: string[]) {
   const sources = [
     { query: 'notable Pakistani politicians', country: 'Pakistan', type: 'Politics' },
     { query: 'notable Pakistani Islamic scholars', country: 'Pakistan', type: 'Religious Scholar' },
-    { query: 'notable Pakistani YouTubers', country: 'Pakistan', type: 'Creator' },
+     { query: 'notable Pakistani athletes and business leaders', country: 'Pakistan', type: 'Sports' },
     { query: 'notable Indian actors', country: 'India', type: 'Entertainment' },
     { query: 'notable Indian cricketers', country: 'India', type: 'Sports' },
     { query: 'notable American YouTubers', country: 'USA', type: 'Creator' },
@@ -297,7 +309,7 @@ function requestedCreator(input: unknown, fallbackColor: string): Match['creator
 
 function emptyState(): DatabaseState {
   return {
-    version: 3,
+    version: DATABASE_VERSION,
     matches: clone(INITIAL_MATCHES),
     people: clone(INITIAL_PEOPLE),
     comments: clone(INITIAL_COMMENTS),
@@ -340,15 +352,24 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     : seeded.people;
   const canonicalNames = new Map(seeded.people.map((person) => [person.id, person.name]));
   return {
-    version: 3,
+    version: DATABASE_VERSION,
     matches: mergedMatches.map((match) => ({ ...match, views: match.views || 0, shares: match.shares || 0 })),
-    people: mergedPeople.filter((person) => !AUTO_PROFILE_BLOCKLIST.has(person.slug)).map((person) => ({
-      ...person,
-      name: canonicalNames.get(person.id) || person.name,
-      votes: resetPeopleActivity ? 0 : person.votes || 0,
-      shares: resetPeopleActivity ? 0 : person.shares || 0,
-      updatedAt: person.updatedAt || nowIso(),
-    })),
+    people: mergedPeople.map((person) => {
+      const seed = seeded.people.find((item) => item.slug === person.slug);
+      const useSeedIdentity = Boolean(seed && isPlaceholderAvatar(person.avatar));
+      return {
+        ...person,
+        name: canonicalNames.get(person.id) || person.name,
+        avatar: isPlaceholderAvatar(person.avatar) && seed?.avatar ? seed.avatar : person.avatar,
+        bio: seed?.bio && (!person.bio || person.bio === person.shortBio) ? seed.bio : person.bio || person.shortBio,
+        profileUrl: useSeedIdentity ? seed?.profileUrl : person.profileUrl,
+        researchUrl: useSeedIdentity ? seed?.researchUrl || seed?.profileUrl : person.researchUrl,
+        archivedAt: person.archivedAt || (shouldArchivePerson(person) ? nowIso() : undefined),
+        votes: resetPeopleActivity ? 0 : person.votes || 0,
+        shares: resetPeopleActivity ? 0 : person.shares || 0,
+        updatedAt: person.updatedAt || nowIso(),
+      };
+    }),
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
@@ -401,6 +422,9 @@ export class PersistentStore {
 
     const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
     const tursoToken = process.env.TURSO_AUTH_TOKEN?.trim();
+    if (process.env.NODE_ENV === 'production' && (!tursoUrl || !tursoToken)) {
+      throw new Error('A Turso database is required in production so deployments cannot erase application data.');
+    }
     if (tursoUrl && !tursoToken) throw new Error('TURSO_AUTH_TOKEN must be configured with TURSO_DATABASE_URL.');
     if (tursoToken && !tursoUrl) throw new Error('TURSO_DATABASE_URL must be configured with TURSO_AUTH_TOKEN.');
 
@@ -430,6 +454,7 @@ export class PersistentStore {
 
     const store = new PersistentStore(dataDir, databasePath, backupDir, remoteDatabase, state);
     await store.persist();
+    await store.backupNow();
     return store;
   }
 
@@ -479,7 +504,7 @@ export class PersistentStore {
   }
 
   getPeopleSnapshot() {
-    return clone(this.state.people).sort((left, right) => {
+    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar))).sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;
       if (right.shares !== left.shares) return right.shares - left.shares;
       return left.name.localeCompare(right.name);
@@ -487,11 +512,100 @@ export class PersistentStore {
   }
 
   getPerson(idOrSlug: string) {
-    return this.state.people.find((person) => person.id === idOrSlug || person.slug === idOrSlug);
+    return this.state.people.find((person) => !person.archivedAt && (person.id === idOrSlug || person.slug === idOrSlug));
+  }
+
+  getAdminPeopleSnapshot() {
+    return clone(this.state.people).sort((left, right) => {
+      if (Boolean(left.archivedAt) !== Boolean(right.archivedAt)) return left.archivedAt ? 1 : -1;
+      return left.name.localeCompare(right.name);
+    });
   }
 
   getAutomationStatus() {
     return clone(this.state.peopleAutomation);
+  }
+
+  private personInput(input: Partial<Person>, existing?: Person): Person {
+    const name = String(input.name ?? existing?.name ?? '').trim().slice(0, 80);
+    const slug = profileSlug(String(input.slug ?? name));
+    const avatar = String(input.avatar ?? existing?.avatar ?? '').trim();
+    const profileUrl = String(input.profileUrl ?? existing?.profileUrl ?? '').trim() || undefined;
+    const researchUrl = String(input.researchUrl ?? existing?.researchUrl ?? profileUrl ?? '').trim() || undefined;
+    const category = String(input.category ?? existing?.category ?? 'Public Figure') as PersonCategory;
+    const country = String(input.country ?? existing?.country ?? 'Global') as PersonCountry;
+    if (name.length < 2 || !slug) throw new StoreError('INVALID_PERSON', 'A profile name is required.');
+    if (!/^https:\/\//i.test(avatar) || isPlaceholderAvatar(avatar)) throw new StoreError('INVALID_PERSON_IMAGE', 'A real HTTPS image URL is required.');
+    if (profileUrl && !/^https:\/\//i.test(profileUrl)) throw new StoreError('INVALID_PROFILE_URL', 'The source profile URL must use HTTPS.');
+    if (researchUrl && !/^https:\/\//i.test(researchUrl)) throw new StoreError('INVALID_RESEARCH_URL', 'The research URL must use HTTPS.');
+    if (!PERSON_CATEGORIES.includes(category)) throw new StoreError('INVALID_PERSON_CATEGORY', 'Choose a valid profile category.');
+    if (!PERSON_COUNTRIES.includes(country)) throw new StoreError('INVALID_PERSON_COUNTRY', 'Choose a valid profile country.');
+    const now = nowIso();
+    return {
+      id: existing?.id || `person-${slug}`,
+      slug,
+      name,
+      shortBio: String(input.shortBio ?? existing?.shortBio ?? '').trim().slice(0, 220),
+      bio: String(input.bio ?? existing?.bio ?? input.shortBio ?? existing?.shortBio ?? '').trim().slice(0, 1200),
+      category,
+      country,
+      avatar,
+      profileUrl,
+      researchUrl,
+      platform: input.platform ?? existing?.platform,
+      verified: input.verified ?? existing?.verified ?? true,
+      followersCount: input.followersCount ?? existing?.followersCount,
+      subscriberCountRaw: input.subscriberCountRaw ?? existing?.subscriberCountRaw,
+      votes: existing?.votes || 0,
+      shares: existing?.shares || 0,
+      updatedAt: now,
+      lastResearchedAt: existing?.lastResearchedAt,
+      archivedAt: existing?.archivedAt,
+    };
+  }
+
+  async createPerson(input: Partial<Person>, actorId = 'admin') {
+    const person = this.personInput(input);
+    if (this.state.people.some((item) => item.slug === person.slug || item.name.toLowerCase() === person.name.toLowerCase())) {
+      throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
+    }
+    this.state.people.push(person);
+    await this.audit('person.created', actorId, { personId: person.id });
+    await this.persist();
+    return clone(person);
+  }
+
+  async updatePerson(idOrSlug: string, input: Partial<Person>, actorId = 'admin') {
+    const person = this.state.people.find((item) => item.id === idOrSlug || item.slug === idOrSlug);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+    const updated = this.personInput(input, person);
+    if (this.state.people.some((item) => item.id !== person.id && (item.slug === updated.slug || item.name.toLowerCase() === updated.name.toLowerCase()))) {
+      throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
+    }
+    Object.assign(person, updated);
+    await this.audit('person.updated', actorId, { personId: person.id });
+    await this.persist();
+    return clone(person);
+  }
+
+  async archivePerson(idOrSlug: string, actorId = 'admin') {
+    const person = this.state.people.find((item) => item.id === idOrSlug || item.slug === idOrSlug);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+    person.archivedAt = nowIso();
+    person.updatedAt = person.archivedAt;
+    await this.audit('person.archived', actorId, { personId: person.id });
+    await this.persist();
+    return clone(person);
+  }
+
+  async restorePerson(idOrSlug: string, actorId = 'admin') {
+    const person = this.state.people.find((item) => item.id === idOrSlug || item.slug === idOrSlug);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+    person.archivedAt = undefined;
+    person.updatedAt = nowIso();
+    await this.audit('person.restored', actorId, { personId: person.id });
+    await this.persist();
+    return clone(person);
   }
 
   async voteForPerson(personId: string, identityKey: string) {
@@ -572,7 +686,7 @@ export class PersistentStore {
     for (const candidate of candidates.slice(0, 5)) {
       const candidateName = String(candidate.name || '').trim().slice(0, 80);
       const profileUrl = String(candidate.profileUrl || '').trim();
-      if (candidateName.length < 2 || !profileUrl || existingKeys.has(candidateName.toLowerCase())) continue;
+      if (candidateName.length < 2 || !profileUrl || candidate.category === 'Creator' || existingKeys.has(candidateName.toLowerCase())) continue;
       let parsedUrl: URL;
       try {
         parsedUrl = new URL(profileUrl);
