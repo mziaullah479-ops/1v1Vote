@@ -1,11 +1,11 @@
 {
-  "name": "1v1Vote - Live Creator Battles",
+  "name": "1v1Vote - Public Figure Rankings",
   "short_name": "1v1Vote",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#070a13",
   "theme_color": "#0ea5e9",
-  "description": "Vote in live creator battles and share the result.",
+  "description": "Vote every 24 hours for public figures and explore source-backed live rankings.",
   "icons": [
     {
       "src": "/icon-192.png",
