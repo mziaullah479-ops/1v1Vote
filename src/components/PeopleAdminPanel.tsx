@@ -43,7 +43,7 @@ export const PeopleAdminPanel: React.FC = () => {
     const response = await fetch('/api/admin/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
     const data = await response.json().catch(() => ({})); setBusy(false);
     if (!response.ok) return setMessage(data.error || 'Unable to sign in.');
-    setPassword(''); setAuthenticated(true); await loadPeople();
+    setPassword(''); setAuthenticated(true); await Promise.all([loadPeople(), loadAutomation()]);
   };
 
   const save = async (event: React.FormEvent) => {
