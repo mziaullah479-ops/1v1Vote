@@ -178,6 +178,10 @@ async function startServer() {
     res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
   });
 
+  app.get('/api/automation/status', (_req, res) => {
+    return res.status(404).json({ error: 'Not found.' });
+  });
+
 
   app.get('/api/people/:personId', (req, res) => {
     const person = store.getPerson(req.params.personId);
