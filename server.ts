@@ -83,7 +83,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
       ? 'Request a Creator Match - 1v1Vote'
       : staticTitles[pathname]
         ? `${staticTitles[pathname]} - 1v1Vote`
-        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Vote & Rank Public Figures';
+        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Public Figure Rankings & Daily Voting';
   const description = person
     ? `Read about ${person.name}, view the source profile, and vote in the live 1v1Vote ranking.`
     : match
