@@ -16,7 +16,7 @@ export interface PeopleAutomationStatus {
   discoveryVersion?: number;
   lastError?: string;
   
-  paused?: boolean;
+  
 }
 
 export interface Person {
