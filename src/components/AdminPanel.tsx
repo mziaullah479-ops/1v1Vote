@@ -58,7 +58,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
     setC1ProfileUrl(url);
     if (!url.trim()) return;
     setIsDetectingC1(true);
-    setStatusMessage('پروفائل کا public metadata حاصل کیا جا رہا ہے (Fetching public profile metadata)...');
+    setStatusMessage('Fetching public profile metadata...');
     try {
       const detected = await fetchSocialProfile(url, c1Name);
       setC1Platform(detected.platform);
@@ -69,7 +69,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
       setC1Avatar(realLogo); // Default to genuine channel logo
       setC1Subs(detected.followersCount);
       setC1Growth(detected.growthRate);
-      setStatusMessage(`✓ پروفائل metadata حاصل ہو گیا۔ Public follower count: ${detected.followersCount || 'Unavailable'}`);
+      setStatusMessage(`✓ Public profile metadata loaded. Follower count: ${detected.followersCount || 'Unavailable'}`);
     } catch (e) {
       console.error('Error auto-detecting C1:', e);
       setStatusMessage('Auto-detect finished with available channel data.');
@@ -82,7 +82,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
     setC2ProfileUrl(url);
     if (!url.trim()) return;
     setIsDetectingC2(true);
-    setStatusMessage('پروفائل کا public metadata حاصل کیا جا رہا ہے (Fetching public profile metadata)...');
+    setStatusMessage('Fetching public profile metadata...');
     try {
       const detected = await fetchSocialProfile(url, c2Name);
       setC2Platform(detected.platform);
@@ -93,7 +93,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
       setC2Avatar(realLogo); // Default to genuine channel logo
       setC2Subs(detected.followersCount);
       setC2Growth(detected.growthRate);
-      setStatusMessage(`✓ پروفائل metadata حاصل ہو گیا۔ Public follower count: ${detected.followersCount || 'Unavailable'}`);
+      setStatusMessage(`✓ Public profile metadata loaded. Follower count: ${detected.followersCount || 'Unavailable'}`);
     } catch (e) {
       console.error('Error auto-detecting C2:', e);
       setStatusMessage('Auto-detect finished with available channel data.');
@@ -358,7 +358,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1.5">
-                    یو آر ایل ڈال کر Auto-Detect دبائیں تو اصل سبسکرائبرز اور چینل کا اصل لوگو فوری لگ جائے گا۔
+                     Enter a public URL and select Auto-Detect to load verified subscriber data and the official channel image.
                   </p>
                 </div>
 
@@ -453,7 +453,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
                         <p className="text-[10px] text-slate-400 truncate">
                           {c1Avatar && c1Avatar !== c1ChannelLogo
                             ? 'Using your custom image URL override'
-                            : 'چینل والا اصل لوگو استعمال ہوگا (ڈیفالٹ)'}
+                             : 'The official channel image will be used by default'}
                         </p>
                       </div>
                     </div>
@@ -519,7 +519,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1.5">
-                    یو آر ایل ڈال کر Auto-Detect دبائیں تو اصل سبسکرائبرز اور چینل کا اصل لوگو فوری لگ جائے گا۔
+                     Enter a public URL and select Auto-Detect to load verified subscriber data and the official channel image.
                   </p>
                 </div>
 
@@ -614,7 +614,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ matches, matchRequests, 
                         <p className="text-[10px] text-slate-400 truncate">
                           {c2Avatar && c2Avatar !== c2ChannelLogo
                             ? 'Using your custom image URL override'
-                            : 'چینل والا اصل لوگو استعمال ہوگا (ڈیفالٹ)'}
+                             : 'The official channel image will be used by default'}
                         </p>
                       </div>
                     </div>
