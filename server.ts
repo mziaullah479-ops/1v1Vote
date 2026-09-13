@@ -178,9 +178,6 @@ async function startServer() {
     res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
   });
 
-  app.get('/api/automation/status', (_req, res) => {
-    res.json(store.getAutomationStatus());
-  });
 
   app.get('/api/people/:personId', (req, res) => {
     const person = store.getPerson(req.params.personId);
@@ -358,6 +355,11 @@ async function startServer() {
     return res.json({ people: store.getAdminPeopleSnapshot() });
   });
 
+  app.get('/api/admin/people/automation', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ automation: store.getAutomationStatus() });
+  });
+
   app.post('/api/admin/people', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -460,6 +462,15 @@ async function startServer() {
     }
   });
 
+  app.post('/api/admin/people/automation', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json({ automation: await store.setPeopleAutomationPaused(Boolean(req.body?.paused)) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.post('/api/admin/backup', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -519,7 +530,7 @@ async function startServer() {
 
   const profileRefreshTimer = setInterval(() => {
     store.runPeopleAutomation().catch((error) => console.error('Scheduled profile automation failed:', error));
-  }, 1000 * 60 * 60 * 24);
+  }, 1000 * 60 * 10);
   profileRefreshTimer.unref?.();
   setTimeout(() => {
     store.runPeopleAutomation().catch((error) => console.error('Initial profile automation failed:', error));
