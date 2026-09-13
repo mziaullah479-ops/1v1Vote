@@ -27,9 +27,11 @@ function errorResponse(res: express.Response, error: unknown) {
 }
 
 function cookieOptions(maxAge: number) {
+  const frontendOrigin = process.env.FRONTEND_ORIGIN?.split(',')[0]?.trim();
+  const crossSiteFrontend = Boolean(frontendOrigin && frontendOrigin !== siteOrigin());
   return {
     httpOnly: true,
-    sameSite: (process.env.FRONTEND_ORIGIN ? 'none' : 'lax') as const,
+    sameSite: (process.env.NODE_ENV === 'production' && crossSiteFrontend ? 'none' : 'lax') as const,
     secure: process.env.NODE_ENV === 'production',
     maxAge,
     path: '/',
@@ -37,7 +39,7 @@ function cookieOptions(maxAge: number) {
 }
 
 function siteOrigin() {
-  return (process.env.FRONTEND_ORIGIN?.split(',')[0]?.trim() || 'https://1v1vote.com').replace(/\/$/, '');
+  return (process.env.PUBLIC_SITE_ORIGIN?.trim() || 'https://1v1vote.com').replace(/\/$/, '');
 }
 
 function escapeHtml(value: string) {
@@ -81,6 +83,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/faq': '1v1Vote FAQ - Public Figure Voting Questions',
     '/contact': 'Contact 1v1Vote - Profile Corrections',
     '/request': 'Request a Profile Review - 1v1Vote',
+    '/vote': 'Vote for Public Figures | 1v1Vote',
     '/vote-guide': '1v1Vote Voting Guide',
     '/site-map': '1v1Vote Site Map',
   };
@@ -90,6 +93,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/faq': 'Answers to common questions about 1v1Vote voting, rankings, and profiles.',
     '/contact': 'Contact 1v1Vote about profile corrections and source information.',
     '/request': 'Request a correction or profile review for the 1v1Vote directory.',
+    '/vote': 'Support public figures you follow and help shape the live 1v1Vote ranking. Vote once every 24 hours with no account required.',
     '/vote-guide': 'A clear guide to voting, cooldowns, rankings, and profile pages.',
     '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
   };
@@ -160,12 +164,31 @@ async function startServer() {
   });
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; connect-src 'self' https:; font-src 'self' https: data:");
+    if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     return next();
   });
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
   app.set('trust proxy', 1);
+  const isTrustedMutation = (req: express.Request) => {
+    const origin = req.get('origin');
+    if (origin) return origin === siteOrigin() || allowedOrigins.has(origin);
+    const referer = req.get('referer');
+    return Boolean(referer && (referer === siteOrigin() || referer.startsWith(`${siteOrigin()}/`)));
+  };
+
+  app.use('/api/admin', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isTrustedMutation(req)) {
+      return res.status(403).json({ error: 'A same-origin request is required.' });
+    }
+    return next();
+  });
 
   const getUser = (req: express.Request) => store.getUserBySession(req.cookies?.[SESSION_COOKIE]);
   const isAdmin = (req: express.Request) => store.getAdminSession(req.cookies?.[ADMIN_COOKIE]);
@@ -445,7 +468,7 @@ async function startServer() {
     }
     failedAdminLogins.delete(ip);
     const token = await store.createAdminSession();
-    res.cookie(ADMIN_COOKIE, token, cookieOptions(1000 * 60 * 60 * 8));
+    res.cookie(ADMIN_COOKIE, token, cookieOptions(1000 * 60 * 60 * 2));
     return res.json({ authenticated: true });
   });
 
@@ -564,6 +587,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     const indexPath = path.join(distPath, 'index.html');
+    app.get('/favicon.ico', (_req, res) => res.redirect(302, '/favicon.png'));
     app.use(express.static(distPath, { index: false }));
     app.get('*', (req, res) => {
       const measurementId = process.env.VITE_GA_MEASUREMENT_ID?.trim();
