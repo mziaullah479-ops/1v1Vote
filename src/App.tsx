@@ -9,7 +9,7 @@ import { SiteFooter } from './components/SiteFooter';
 export default function App() {
   const pathname = window.location.pathname.replace(/\/$/, '') || '/';
   useEffect(() => {
-    if (pathname === '/') setPageSeo('1v1Vote - Public Figure Rankings & Daily Voting', 'Vote every 24 hours for public figures, leaders, scholars, athletes, artists, and entrepreneurs.', '/');
+    if (pathname === '/') setPageSeo('1v1Vote - Live Public Figure Rankings & Daily Voting', 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once every 24 hours.', '/');
   }, [pathname]);
   if (pathname === '/admin') return <PeopleAdminPanel />;
   const profileMatch = pathname.match(/^\/people\/([^/]+)$/);
