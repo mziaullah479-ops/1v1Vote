@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, MatchRequest, Person, UserProfile } from '../types';
+import { Comment, Match, MatchRequest, Person, PeopleAutomationStatus, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
 import { scrapeSocialProfile } from './socialScraper';
@@ -81,6 +81,17 @@ interface DatabaseState {
   adminSessions: StoredAdminSession[];
   audit: AuditEntry[];
   matchRequests: MatchRequest[];
+  peopleAutomation: PeopleAutomationStatus;
+}
+
+interface DiscoveryCandidate {
+  name?: string;
+  category?: string;
+  country?: string;
+  shortBio?: string;
+  bio?: string;
+  profileUrl?: string;
+  platform?: string;
 }
 
 export class StoreError extends Error {
@@ -115,6 +126,46 @@ async function fetchPublicProfileSummary(url: string) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function isUsableImage(url: string | undefined) {
+  if (!url || !/^https:\/\//i.test(url)) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { Range: 'bytes=0-1024', 'User-Agent': '1v1Vote profile research bot/1.0' },
+    });
+    return response.ok && (response.headers.get('content-type') || '').toLowerCase().startsWith('image/');
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function profileSlug(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 80);
+}
+
+async function discoverWithGemini(apiKey: string, existingNames: string[]) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: `Find up to five notable public figures who are not in this existing list: ${existingNames.join(', ')}. Use a balanced mix of Pakistan and global public figures, creators, religious scholars, politicians, athletes, entertainers, and business leaders. Use Google Search grounding when available. Only include people with a reliable public profile page and a real public image source. Do not invent identities, URLs, roles, or current offices. Return only a JSON array with objects containing name, category, country, shortBio, bio, profileUrl, and platform. Categories must be Public Figure, Religious Scholar, Politics, Creator, Sports, Entertainment, or Business. Countries must be Pakistan, India, USA, or Global. Keep shortBio under 180 characters and bio under 600 characters.` }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+    }),
+  });
+  if (!response.ok) throw new Error(`Research provider returned ${response.status}`);
+  const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
+  const json = text.match(/\[[\s\S]*\]/)?.[0];
+  if (!json) throw new Error('Research provider returned no profile list.');
+  const candidates = JSON.parse(json) as unknown;
+  return Array.isArray(candidates) ? candidates as DiscoveryCandidate[] : [];
 }
 
 function tokenHash(token: string) {
@@ -211,6 +262,13 @@ function emptyState(): DatabaseState {
     adminSessions: [],
     audit: [],
     matchRequests: [],
+    peopleAutomation: {
+      enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      state: process.env.GEMINI_API_KEY?.trim() ? 'idle' : 'source-refresh',
+      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Public source refresh',
+      lastRefreshed: 0,
+      lastPublished: 0,
+    },
   };
 }
 
@@ -252,12 +310,19 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     adminSessions: Array.isArray(input.adminSessions) ? input.adminSessions : [],
     audit: Array.isArray(input.audit) ? input.audit : [],
     matchRequests: Array.isArray(input.matchRequests) ? input.matchRequests : [],
+    peopleAutomation: {
+      ...seeded.peopleAutomation,
+      ...(input.peopleAutomation || {}),
+      enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Public source refresh',
+    },
   };
 }
 
 export class PersistentStore {
   private state: DatabaseState;
   private writeQueue: Promise<void> = Promise.resolve();
+  private peopleAutomationBusy = false;
 
   private constructor(
     private readonly dataDir: string,
@@ -376,6 +441,10 @@ export class PersistentStore {
     return this.state.people.find((person) => person.id === idOrSlug || person.slug === idOrSlug);
   }
 
+  getAutomationStatus() {
+    return clone(this.state.peopleAutomation);
+  }
+
   async voteForPerson(personId: string, identityKey: string) {
     const person = this.getPerson(personId);
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
@@ -437,6 +506,106 @@ export class PersistentStore {
     }
     if (refreshed > 0) await this.persist();
     return refreshed;
+  }
+
+  private async discoverPeople() {
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) return 0;
+    const existingNames = this.state.people.map((person) => person.name);
+    const candidates = await discoverWithGemini(apiKey, existingNames);
+    const existingKeys = new Set(this.state.people.flatMap((person) => [person.name.toLowerCase(), person.slug.toLowerCase(), person.profileUrl?.toLowerCase() || '']));
+    const categories = new Set(['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business']);
+    const countries = new Set(['Pakistan', 'India', 'USA', 'Global']);
+    const socialHosts = /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitch\.tv/i;
+    let published = 0;
+
+    for (const candidate of candidates.slice(0, 5)) {
+      const candidateName = String(candidate.name || '').trim().slice(0, 80);
+      const profileUrl = String(candidate.profileUrl || '').trim();
+      if (candidateName.length < 2 || !profileUrl || existingKeys.has(candidateName.toLowerCase())) continue;
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(profileUrl);
+      } catch {
+        continue;
+      }
+      if (parsedUrl.protocol !== 'https:') continue;
+
+      try {
+        const researched = socialHosts.test(profileUrl)
+          ? await scrapeSocialProfile(profileUrl, candidateName)
+          : await fetchPublicProfileSummary(profileUrl);
+        const image = ('avatarUrl' in researched ? researched.avatarUrl : researched.avatar) || '';
+        if (!(await isUsableImage(image))) continue;
+        const name = ('name' in researched && researched.name) || candidateName;
+        const slug = profileSlug(name);
+        if (!slug || existingKeys.has(slug) || existingKeys.has(name.toLowerCase())) continue;
+        const category = categories.has(String(candidate.category)) ? String(candidate.category) as Person['category'] : 'Public Figure';
+        const country = countries.has(String(candidate.country)) ? String(candidate.country) as Person['country'] : 'Global';
+        const now = nowIso();
+        const person: Person = {
+          id: `person-${slug}`,
+          slug,
+          name,
+          shortBio: String(candidate.shortBio || ('shortBio' in researched ? researched.shortBio : '') || 'A notable public figure researched from a reliable public source.').slice(0, 220),
+          bio: String(candidate.bio || candidate.shortBio || ('shortBio' in researched ? researched.shortBio : '') || '').slice(0, 700),
+          category,
+          country,
+          avatar: image,
+          profileUrl,
+          researchUrl: profileUrl,
+          platform: 'platform' in researched ? researched.platform : undefined,
+          verified: false,
+          followersCount: 'followersCount' in researched ? researched.followersCount : undefined,
+          subscriberCountRaw: 'subscriberCountRaw' in researched ? researched.subscriberCountRaw : undefined,
+          votes: 0,
+          shares: 0,
+          updatedAt: now,
+          lastResearchedAt: now,
+        };
+        this.state.people.push(person);
+        existingKeys.add(name.toLowerCase());
+        existingKeys.add(slug);
+        existingKeys.add(profileUrl.toLowerCase());
+        published += 1;
+      } catch (error) {
+        console.error(`Discovery validation failed for ${candidateName}`, error);
+      }
+    }
+    if (published > 0) await this.persist();
+    return published;
+  }
+
+  async runPeopleAutomation(force = false) {
+    const current = this.state.peopleAutomation;
+    if (this.peopleAutomationBusy) return this.getAutomationStatus();
+    if (!force && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
+      return this.getAutomationStatus();
+    }
+    this.peopleAutomationBusy = true;
+    current.state = 'running';
+    current.lastError = undefined;
+    try {
+      const refreshed = await this.refreshPeopleProfiles();
+      const published = await this.discoverPeople();
+      current.enabled = Boolean(process.env.GEMINI_API_KEY?.trim());
+      current.provider = current.enabled ? 'Google Search + Gemini' : 'Public source refresh';
+      current.state = current.enabled ? 'active' : 'source-refresh';
+      current.lastRunAt = nowIso();
+      current.lastRefreshed = refreshed;
+      current.lastPublished = published;
+      current.nextRunAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    } catch (error) {
+      current.state = 'error';
+      current.lastRunAt = nowIso();
+      current.lastRefreshed = 0;
+      current.lastPublished = 0;
+      current.lastError = error instanceof Error ? error.message : 'The automation run failed.';
+    } finally {
+      this.peopleAutomationBusy = false;
+      await this.persist();
+    }
+    return this.getAutomationStatus();
   }
 
   getMatch(idOrSlug: string) {
