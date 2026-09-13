@@ -37,6 +37,7 @@ export interface Person {
   shares: number;
   updatedAt: string;
   lastResearchedAt?: string;
+  archivedAt?: string;
 }
 
 export interface Creator {
