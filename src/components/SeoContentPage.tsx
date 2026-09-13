@@ -2,12 +2,18 @@ import React, { useEffect } from 'react';
 import { ArrowLeft, BookOpen, ChevronRight, Globe2, ShieldCheck, Sparkles, Vote } from 'lucide-react';
 import { setPageSeo } from '../seo';
 
+export interface SeoFaq {
+  question: string;
+  answer: string;
+}
+
 export interface SeoPageData {
   title: string;
   description: string;
   eyebrow: string;
   paragraphs: string[];
   bullets: string[];
+  faqs?: SeoFaq[];
 }
 
 export const SEO_PAGES: Record<string, SeoPageData> = {
@@ -52,9 +58,49 @@ export const SEO_PAGES: Record<string, SeoPageData> = {
   '/site-map': { title: '1v1Vote Site Map', description: 'Browse the public pages and directories available on 1v1Vote.', eyebrow: 'Site map', paragraphs: ['The site map links the public rankings, educational pages, category directories, country pages, and individual profile pages.', 'Every public profile page has its own title and source-aware metadata.'], bullets: ['Rankings and voting', 'Categories and countries', 'Profile pages', 'Data and policy pages'] },
 };
 
+const PAGE_CONTEXT: Record<string, string> = {
+  '/about': 'readers who want to understand the purpose and editorial boundaries of the public ranking',
+  '/how-it-works': 'new visitors who want a clear explanation of searching, voting, cooldowns, and rank changes',
+  '/rankings': 'visitors comparing the live order of people across countries and categories',
+  '/people': 'readers browsing the full source-backed directory rather than a single social platform',
+  '/vote': 'visitors who want to cast a fair daily vote without creating an account',
+  '/discover': 'readers learning how new people are researched, checked, and approved before publication',
+  '/profiles': 'people opening a dedicated profile page to read a biography, inspect a source, and vote',
+  '/sources': 'readers who want to understand where names, biographies, and images come from',
+  '/editorial-policy': 'people checking the quality rules applied before a profile is made public',
+  '/data-safety': 'visitors who want a plain-language explanation of persistence, backups, and non-destructive archives',
+  '/privacy': 'visitors reviewing what the site stores to enforce the daily voting rule',
+  '/terms': 'people who want to use the public ranking responsibly and understand what a vote means',
+  '/faq': 'visitors looking for direct answers about votes, profiles, searches, ads, and corrections',
+  '/contact': 'people reporting a source, image, biography, or profile issue for review',
+  '/request': 'visitors asking for a missing public figure or a correction to an existing profile',
+  '/site-map': 'readers navigating the public information architecture and profile routes',
+};
+
+function enrichSeoPage(path: string, page: SeoPageData): SeoPageData & { faqs: SeoFaq[] } {
+  const context = PAGE_CONTEXT[path] || 'visitors exploring the ' + page.eyebrow.toLowerCase() + ' section of the source-backed public ranking';
+  const primary = page.bullets[0] || 'the page topic';
+  const secondary = page.bullets[1] || 'the related public profiles';
+  return {
+    ...page,
+    paragraphs: [
+      ...page.paragraphs,
+      'This page is written for ' + context + '. It explains ' + page.description.toLowerCase() + ' The goal is to give readers enough context to make an informed choice instead of presenting a thin doorway page with repeated copy.',
+      'Start with ' + primary.toLowerCase() + ', then use ' + secondary.toLowerCase() + ' to continue into the live directory. Profile pages show the person, source link, current vote total, and the same 24-hour rule used across 1v1Vote.',
+    ],
+    bullets: [...page.bullets, 'Read the page-specific guidance before voting or sharing'],
+    faqs: [
+      { question: 'What is the purpose of the ' + page.eyebrow.toLowerCase() + ' page?', answer: 'It is a dedicated guide for ' + context + '. The page adds context around ' + primary.toLowerCase() + ' and links readers back to real profiles and public sources.' },
+      { question: 'How should I use this 1v1Vote page?', answer: 'Read the explanation first, use the relevant directory or filter, and open a profile before voting. A vote should reflect your own opinion, not an automatic score or an editorial endorsement.' },
+      { question: 'Does this page change the public vote total?', answer: 'No. Reading a page does not affect rankings. Public totals change only when a visitor submits a permitted vote, and the server enforces one vote for each profile every 24 hours.' },
+    ],
+  };
+}
+
 export const SeoContentPage: React.FC<{ page: SeoPageData }> = ({ page }) => {
   const path = window.location.pathname.replace(/\/$|^$/, '') || '/';
-  useEffect(() => setPageSeo(page.title, page.description, path), [page, path]);
-  return <main className="min-h-screen bg-[#060a13] px-4 py-8 text-slate-100 sm:px-6 sm:py-14"><div className="mx-auto max-w-4xl"><a href="/" className="inline-flex items-center gap-2 text-xs font-bold text-sky-300 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to live rankings</a><section className="mt-8 rounded-[2rem] border border-sky-500/20 bg-gradient-to-br from-[#0d1b36] to-[#0a0e19] p-6 shadow-2xl sm:p-10"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-sky-300"><BookOpen className="h-4 w-4" /> {page.eyebrow}</div><h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-5xl">{page.title}</h1><p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">{page.description}</p></section><div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_.7fr]"><article className="rounded-3xl border border-slate-800 bg-[#0b1221] p-6 sm:p-8">{page.paragraphs.map((paragraph) => <p key={paragraph} className="mb-5 text-sm leading-8 text-slate-300 last:mb-0">{paragraph}</p>)}</article><aside className="rounded-3xl border border-slate-800 bg-[#0b1221] p-6"><div className="flex items-center gap-2 text-sm font-black text-white"><Sparkles className="h-4 w-4 text-amber-300" /> Key points</div><ul className="mt-5 space-y-4">{page.bullets.map((bullet) => <li key={bullet} className="flex gap-3 text-sm leading-6 text-slate-400"><ChevronRight className="mt-1 h-4 w-4 shrink-0 text-sky-300" />{bullet}</li>)}</ul></aside></div><div className="mt-6 grid gap-3 sm:grid-cols-3"><a href="/people" className="rounded-2xl border border-slate-800 bg-[#0b1221] p-4 text-sm font-bold text-white hover:border-sky-500/50"><Globe2 className="mb-3 h-5 w-5 text-sky-300" />Browse people</a><a href="/how-it-works" className="rounded-2xl border border-slate-800 bg-[#0b1221] p-4 text-sm font-bold text-white hover:border-sky-500/50"><Vote className="mb-3 h-5 w-5 text-emerald-300" />How voting works</a><a href="/data-safety" className="rounded-2xl border border-slate-800 bg-[#0b1221] p-4 text-sm font-bold text-white hover:border-sky-500/50"><ShieldCheck className="mb-3 h-5 w-5 text-amber-300" />Data safety</a></div></div></main>;
+  const content = enrichSeoPage(path, page);
+  useEffect(() => setPageSeo(content.title, content.description, path), [content, path]);
+  return <main className="min-h-screen bg-[#060a13] px-4 py-8 text-slate-100 sm:px-6 sm:py-14"><div className="mx-auto max-w-4xl"><a href="/" className="inline-flex items-center gap-2 text-xs font-bold text-sky-300 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to live rankings</a><section className="mt-8 rounded-[2rem] border border-sky-500/20 bg-gradient-to-br from-[#0d1b36] to-[#0a0e19] p-6 shadow-2xl sm:p-10"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-sky-300"><BookOpen className="h-4 w-4" /> {content.eyebrow}</div><h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-5xl">{content.title}</h1><p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">{content.description}</p></section><div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_.7fr]"><article className="rounded-3xl border border-slate-800 bg-[#0b1221] p-6 sm:p-8">{content.paragraphs.map((paragraph) => <p key={paragraph} className="mb-5 text-sm leading-8 text-slate-300 last:mb-0">{paragraph}</p>)}</article><aside className="rounded-3xl border border-slate-800 bg-[#0b1221] p-6"><div className="flex items-center gap-2 text-sm font-black text-white"><Sparkles className="h-4 w-4 text-amber-300" /> Key points</div><ul className="mt-5 space-y-4">{content.bullets.map((bullet) => <li key={bullet} className="flex gap-3 text-sm leading-6 text-slate-400"><ChevronRight className="mt-1 h-4 w-4 shrink-0 text-sky-300" />{bullet}</li>)}</ul></aside></div><section className="mt-6 rounded-3xl border border-slate-800 bg-[#0b1221] p-6 sm:p-8"><h2 className="text-xl font-black text-white">Questions and answers about {content.eyebrow}</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{content.faqs.map((faq) => <article key={faq.question} className="rounded-2xl border border-slate-800/80 bg-[#060b17] p-4"><h3 className="text-sm font-black leading-6 text-white">{faq.question}</h3><p className="mt-2 text-xs leading-6 text-slate-400">{faq.answer}</p></article>)}</div></section><div className="mt-6 grid gap-3 sm:grid-cols-3"><a href="/people" className="rounded-2xl border border-slate-800 bg-[#0b1221] p-4 text-sm font-bold text-white hover:border-sky-500/50"><Globe2 className="mb-3 h-5 w-5 text-sky-300" />Browse people</a><a href="/how-it-works" className="rounded-2xl border border-slate-800 bg-[#0b1221] p-4 text-sm font-bold text-white hover:border-sky-500/50"><Vote className="mb-3 h-5 w-5 text-emerald-300" />How voting works</a><a href="/data-safety" className="rounded-2xl border border-slate-800 bg-[#0b1221] p-4 text-sm font-bold text-white hover:border-sky-500/50"><ShieldCheck className="mb-3 h-5 w-5 text-amber-300" />Data safety</a></div></div></main>;
 };
 
