@@ -112,8 +112,8 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-sky-300">Creator Match Requests</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">اپنا official match لگوائیں</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">اپنے دونوں social accounts کی public profile URLs، ownership proof اور payment reference دیں۔ Admin verification کے بعد match مقررہ وقت پر publish ہوگا۔</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Request an official creator match</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Submit both public social profile URLs, an ownership proof plan, and a payment reference. An admin verifies the request before publishing.</p>
           </div>
           <ShieldCheck className="h-10 w-10 text-emerald-300" />
         </div>
@@ -121,7 +121,7 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
 
       {!user && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/35 bg-amber-950/25 p-4 text-sm text-amber-100">
-          <span>Request submit کرنے کے لیے secure account بنائیں یا sign in کریں۔</span>
+          <span>Create an account or sign in to submit a request.</span>
           <button onClick={onOpenAuth} className="rounded-xl bg-amber-500 px-4 py-2 font-bold text-slate-950">Create account</button>
         </div>
       )}
@@ -156,10 +156,10 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
           <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-[#060b16] p-3 text-xs text-slate-300"><CalendarClock className="h-4 w-4 text-sky-300" /> Expected end: <strong className="text-white">{endPreview}</strong></div>
 
           <label className="block text-xs font-semibold text-slate-300">Ownership proof plan
-            <textarea required minLength={20} value={ownershipNote} onChange={(event) => setOwnershipNote(event.target.value)} placeholder="مثال: دونوں channels میرے ہیں؛ میں public bio میں دی گئی verification phrase رکھوں گا، یا admin کو ownership proof دوں گا۔" className="mt-2 min-h-24 w-full rounded-xl border border-slate-700 bg-[#060b16] px-3 py-3 text-sm text-white outline-none focus:border-sky-400" />
+            <textarea required minLength={20} value={ownershipNote} onChange={(event) => setOwnershipNote(event.target.value)} placeholder="Example: I own both channels and can provide the public verification phrase or ownership documents." className="mt-2 min-h-24 w-full rounded-xl border border-slate-700 bg-[#060b16] px-3 py-3 text-sm text-white outline-none focus:border-sky-400" />
           </label>
           <label className="block text-xs font-semibold text-slate-300">Match description (optional)
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="یہ matchup کس موضوع یا audience کے لیے ہے؟" className="mt-2 min-h-20 w-full rounded-xl border border-slate-700 bg-[#060b16] px-3 py-3 text-sm text-white outline-none focus:border-sky-400" />
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What topic or audience is this matchup for?" className="mt-2 min-h-20 w-full rounded-xl border border-slate-700 bg-[#060b16] px-3 py-3 text-sm text-white outline-none focus:border-sky-400" />
           </label>
           <label className="block text-xs font-semibold text-slate-300">Payment transaction reference
             <input required minLength={4} value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder="Transaction ID / reference" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#060b16] px-3 py-3 text-sm text-white outline-none focus:border-sky-400" />
@@ -185,7 +185,7 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
               {requests.map((request) => <div key={request.id} className="rounded-xl border border-slate-800 bg-[#060b16] p-3 text-xs"><div className="flex justify-between gap-2"><strong className="text-slate-200">{request.creator1.name} vs {request.creator2.name}</strong><span className={request.status === 'approved' ? 'text-emerald-300' : request.status === 'rejected' ? 'text-rose-300' : 'text-amber-300'}>{request.status}</span></div><p className="mt-1 text-slate-500">PKR {request.paymentAmountPkr.toLocaleString()} · {request.paymentStatus}</p></div>)}
             </div>
           </div>
-          <div className="rounded-3xl border border-slate-800 bg-[#09101f] p-5 text-xs leading-5 text-slate-400"><strong className="text-white">Important:</strong> صرف وہی profiles submit کریں جن کی ownership آپ ثابت کر سکتے ہیں۔ Admin public links، verification proof اور payment reference دیکھ کر 24 گھنٹے کے اندر فیصلہ کرے گا۔</div>
+          <div className="rounded-3xl border border-slate-800 bg-[#09101f] p-5 text-xs leading-5 text-slate-400"><strong className="text-white">Important:</strong> Submit only profiles whose ownership you can prove. An admin checks public links, verification evidence, and the payment reference before deciding.</div>
         </aside>
       </div>
     </div>
