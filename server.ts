@@ -488,7 +488,14 @@ async function startServer() {
   });
 
   app.get('/sitemap.xml', (_req, res) => {
-    const paths = new Set(['/']);
+    const paths = new Set([
+      '/', '/request', '/about', '/how-it-works', '/rankings', '/people', '/vote', '/discover', '/profiles', '/sources',
+      '/editorial-policy', '/data-safety', '/privacy', '/terms', '/faq', '/contact', '/pakistan', '/india', '/usa', '/global',
+      '/politics', '/religious-scholars', '/sports', '/entertainment', '/business', '/public-figures', '/leaders', '/scholars',
+      '/athletes', '/actors', '/entrepreneurs', '/pakistani-leaders', '/pakistani-scholars', '/international-stars', '/vote-guide',
+      '/categories', '/country-rankings', '/daily-vote', '/profile-corrections', '/site-map',
+      ...store.getPeopleSnapshot().map((person) => `/people/${person.slug}`),
+    ]);
     const urls = [...paths].map((pathname) => `<url><loc>${escapeXml(`${siteOrigin()}${pathname}`)}</loc></url>`).join('');
     return res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
   });
