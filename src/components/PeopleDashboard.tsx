@@ -4,7 +4,7 @@ import { INITIAL_PEOPLE } from '../data/seedData';
 import { Person, PersonCategory, PersonCountry, PeopleAutomationStatus } from '../types';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
-const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Creator', 'Sports', 'Entertainment', 'Business'];
+const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Sports', 'Entertainment', 'Business'];
 const countries: Array<'All' | PersonCountry> = ['All', 'Pakistan', 'India', 'USA', 'Global'];
 
 function sortPeople(people: Person[]) {
@@ -55,6 +55,7 @@ interface PersonCardProps {
 }
 
 const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote, onShare }) => {
+  const [imageError, setImageError] = useState(false);
   const isCoolingDown = Boolean(cooldown && new Date(cooldown).getTime() > Date.now());
   const isTopThree = rank <= 3;
   return (
@@ -66,11 +67,11 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
             #{rank}
           </div>
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
-            <img src={person.avatar} alt={person.name} width={56} height={56} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-            <span className="absolute inset-0 -z-10 flex items-center justify-center text-sm font-black text-sky-300">{personInitials(person.name)}</span>
+            {!imageError && <img src={person.avatar} alt={person.name} width={56} height={56} loading="lazy" decoding="async" className="relative z-10 h-full w-full object-cover" onError={() => setImageError(true)} />}
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-sky-300">{personInitials(person.name)}</span>
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-black text-white">{person.name}</h2>
+            <a href={`/people/${encodeURIComponent(person.slug)}`} className="block truncate text-base font-black text-white hover:text-sky-300">{person.name}</a>
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
               <span className="text-sky-300">{person.category}</span>
               <span>•</span>
@@ -196,7 +197,7 @@ export const PeopleDashboard: React.FC = () => {
   };
 
   const handleShare = async (person: Person) => {
-    const shareUrl = `${window.location.origin}/?person=${encodeURIComponent(person.slug)}`;
+    const shareUrl = `${window.location.origin}/people/${encodeURIComponent(person.slug)}`;
     void fetch(`/api/people/${encodeURIComponent(person.id)}/share`, { method: 'POST' }).catch(() => undefined);
     try {
       if (navigator.share) {
@@ -211,7 +212,11 @@ export const PeopleDashboard: React.FC = () => {
   };
 
   const visiblePeople = people.filter((person) => {
-    const matchesSearch = !search.trim() || `${person.name} ${person.shortBio} ${person.category}`.toLowerCase().includes(search.toLowerCase());
+    const query = search.trim().toLowerCase();
+    const rankQuery = query.match(/(?:rank|number|#)?\s*(\d+)/)?.[1];
+    const rank = people.findIndex((item) => item.id === person.id) + 1;
+    const matchesRank = Boolean(rankQuery && Number(rankQuery) === rank);
+    const matchesSearch = !query || matchesRank || `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query);
     return matchesSearch && (category === 'All' || person.category === category) && (country === 'All' || person.country === country);
   });
   const totalVotes = people.reduce((sum, person) => sum + person.votes, 0);
