@@ -23,9 +23,6 @@ const measurementId =
 const gtmId =
   (import.meta.env.VITE_GTM_CONTAINER_ID as string | undefined) ||
   window.__RUNTIME_CONFIG__?.gtmId;
-const adsenseClientId =
-  (import.meta.env.VITE_ADSENSE_CLIENT_ID as string | undefined) ||
-  window.__RUNTIME_CONFIG__?.adsenseClientId;
 
 function loadExternalScript(src: string, crossOrigin?: string) {
   const script = document.createElement('script');
@@ -57,15 +54,6 @@ if (gtmId) {
   window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
   deferThirdPartyWork(() => {
     loadExternalScript(`https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(gtmId)}`);
-  });
-}
-
-if (adsenseClientId) {
-  deferThirdPartyWork(() => {
-    loadExternalScript(
-      `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(adsenseClientId)}`,
-      'anonymous',
-    );
   });
 }
 
