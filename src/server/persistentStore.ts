@@ -97,6 +97,7 @@ interface DiscoveryCandidate {
 }
 
 const DATABASE_VERSION = 4;
+const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971',
@@ -323,12 +324,13 @@ function emptyState(): DatabaseState {
     audit: [],
     matchRequests: [],
     peopleAutomation: {
-      enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      enabled: true,
       state: process.env.GEMINI_API_KEY?.trim() ? 'idle' : 'source-refresh',
       provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
       lastRefreshed: 0,
       lastPublished: 0,
-      discoveryVersion: 3,
+      discoveryVersion: 4,
+      paused: false,
     },
   };
 }
@@ -383,7 +385,8 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     peopleAutomation: {
       ...seeded.peopleAutomation,
       ...(input.peopleAutomation || {}),
-      enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      enabled: !(input.peopleAutomation?.paused ?? false),
+      paused: Boolean(input.peopleAutomation?.paused),
       provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
     },
   };
@@ -671,7 +674,7 @@ export class PersistentStore {
     return refreshed;
   }
 
-  private async discoverPeople() {
+  private async discoverPeople(limit = 1) {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     const existingNames = this.state.people.map((person) => person.name);
     const candidates = apiKey
@@ -683,7 +686,7 @@ export class PersistentStore {
     const socialHosts = /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitch\.tv/i;
     let published = 0;
 
-    for (const candidate of candidates.slice(0, 5)) {
+    for (const candidate of candidates.slice(0, limit)) {
       const candidateName = String(candidate.name || '').trim().slice(0, 80);
       const profileUrl = String(candidate.profileUrl || '').trim();
       if (candidateName.length < 2 || !profileUrl || candidate.category === 'Creator' || existingKeys.has(candidateName.toLowerCase())) continue;
@@ -743,7 +746,8 @@ export class PersistentStore {
   async runPeopleAutomation(force = false) {
     const current = this.state.peopleAutomation;
     if (this.peopleAutomationBusy) return this.getAutomationStatus();
-    if (!force && current.discoveryVersion === 3 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
+    if (!force && current.paused) return this.getAutomationStatus();
+    if (!force && current.discoveryVersion === 4 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < PEOPLE_AUTOMATION_INTERVAL_MS) {
       return this.getAutomationStatus();
     }
     this.peopleAutomationBusy = true;
@@ -751,15 +755,15 @@ export class PersistentStore {
     current.lastError = undefined;
     try {
       const refreshed = await this.refreshPeopleProfiles();
-      const published = await this.discoverPeople();
-      current.enabled = Boolean(process.env.GEMINI_API_KEY?.trim());
-      current.provider = current.enabled ? 'Google Search + Gemini' : 'Wikipedia public sources';
-      current.state = 'active';
+      const published = await this.discoverPeople(1);
+      current.enabled = !current.paused;
+      current.provider = process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources';
+      current.state = current.paused ? 'idle' : 'active';
       current.lastRunAt = nowIso();
       current.lastRefreshed = refreshed;
       current.lastPublished = published;
-      current.discoveryVersion = 3;
-      current.nextRunAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      current.discoveryVersion = 4;
+      current.nextRunAt = current.paused ? undefined : new Date(Date.now() + PEOPLE_AUTOMATION_INTERVAL_MS).toISOString();
     } catch (error) {
       current.state = 'error';
       current.lastRunAt = nowIso();
@@ -773,6 +777,15 @@ export class PersistentStore {
     return this.getAutomationStatus();
   }
 
+  async setPeopleAutomationPaused(paused: boolean, actorId = 'admin') {
+    this.state.peopleAutomation.paused = paused;
+    this.state.peopleAutomation.enabled = !paused;
+    this.state.peopleAutomation.state = paused ? 'idle' : 'active';
+    this.state.peopleAutomation.nextRunAt = paused ? undefined : new Date(Date.now() + PEOPLE_AUTOMATION_INTERVAL_MS).toISOString();
+    await this.audit(paused ? 'people.automation.paused' : 'people.automation.resumed', actorId);
+    await this.persist();
+    return this.getAutomationStatus();
+  }
   getMatch(idOrSlug: string) {
     return this.state.matches.find((match) => match.id === idOrSlug || match.slug === idOrSlug);
   }
