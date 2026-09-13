@@ -15,8 +15,8 @@ export interface PeopleAutomationStatus {
   lastPublished: number;
   discoveryVersion?: number;
   lastError?: string;
-  
-  
+  nextRunAt?: string;
+  paused?: boolean;
 }
 
 export interface Person {
