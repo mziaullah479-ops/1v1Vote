@@ -97,6 +97,26 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+async function fetchPublicProfileSummary(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': '1v1Vote profile research bot/1.0' },
+    });
+    if (!response.ok) return {};
+    const html = await response.text();
+    const meta = (property: string) => html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i'))?.[1]?.trim();
+    const title = meta('og:title') || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
+    const description = meta('og:description') || meta('description');
+    const image = meta('og:image');
+    return { name: title?.replace(/\s*[|\-–]\s*(Wikipedia|YouTube).*$/i, '').trim(), shortBio: description, avatar: image };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function tokenHash(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -386,15 +406,20 @@ export class PersistentStore {
   async refreshPeopleProfiles() {
     let refreshed = 0;
     for (const person of this.state.people) {
-      if (!person.researchUrl) continue;
+      const researchUrl = person.researchUrl || person.profileUrl;
+      if (!researchUrl) continue;
       try {
-        const result = await scrapeSocialProfile(person.researchUrl, person.name);
+        const isSocialProfile = /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitch\.tv/i.test(researchUrl);
+        const result = isSocialProfile
+          ? await scrapeSocialProfile(researchUrl, person.name)
+          : await fetchPublicProfileSummary(researchUrl);
         person.name = result.name || person.name;
-        person.avatar = result.avatarUrl || person.avatar;
-        person.profileUrl = result.profileUrl || person.profileUrl;
-        person.platform = result.platform;
-        person.followersCount = result.followersCount || person.followersCount;
-        person.subscriberCountRaw = result.subscriberCountRaw || person.subscriberCountRaw;
+        if ('shortBio' in result) person.shortBio = result.shortBio || person.shortBio;
+        person.avatar = ('avatarUrl' in result ? result.avatarUrl : result.avatar) || person.avatar;
+        person.profileUrl = ('profileUrl' in result ? result.profileUrl : person.profileUrl) || person.profileUrl;
+        if ('platform' in result) person.platform = result.platform;
+        if ('followersCount' in result) person.followersCount = result.followersCount || person.followersCount;
+        if ('subscriberCountRaw' in result) person.subscriberCountRaw = result.subscriberCountRaw || person.subscriberCountRaw;
         person.lastResearchedAt = nowIso();
         person.updatedAt = nowIso();
         refreshed += 1;
