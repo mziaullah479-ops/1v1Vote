@@ -417,7 +417,7 @@ async function startServer() {
   });
 
   app.get('/sitemap.xml', (_req, res) => {
-    const paths = new Set(['/', '/request', ...store.getSnapshot().matches.map((match) => `/vs/${match.slug}`)]);
+    const paths = new Set(['/']);
     const urls = [...paths].map((pathname) => `<url><loc>${escapeXml(`${siteOrigin()}${pathname}`)}</loc></url>`).join('');
     return res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
   });
