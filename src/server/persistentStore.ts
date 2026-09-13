@@ -230,10 +230,17 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
         ...seeded.people.filter((seed) => !storedPeople.some((person) => person.id === seed.id || person.slug === seed.slug)),
       ]
     : seeded.people;
+  const canonicalNames = new Map(seeded.people.map((person) => [person.id, person.name]));
   return {
     version: 2,
     matches: mergedMatches.map((match) => ({ ...match, views: match.views || 0, shares: match.shares || 0 })),
-    people: mergedPeople.map((person) => ({ ...person, votes: person.votes || 0, shares: person.shares || 0, updatedAt: person.updatedAt || nowIso() })),
+    people: mergedPeople.map((person) => ({
+      ...person,
+      name: canonicalNames.get(person.id) || person.name,
+      votes: person.votes || 0,
+      shares: person.shares || 0,
+      updatedAt: person.updatedAt || nowIso(),
+    })),
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
