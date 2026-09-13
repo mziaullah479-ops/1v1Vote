@@ -1,34 +1,18 @@
 import React, { useEffect } from 'react';
 import { PeopleDashboard } from './components/PeopleDashboard';
-
-function setMeta(attribute: 'name' | 'property', key: string, content: string) {
-  let element = document.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
-  if (!element) {
-    element = document.createElement('meta');
-    element.setAttribute(attribute, key);
-    document.head.appendChild(element);
-  }
-  element.content = content;
-}
+import { PeopleAdminPanel } from './components/PeopleAdminPanel';
+import { PersonProfilePage } from './components/PersonProfilePage';
+import { SeoContentPage, SEO_PAGES } from './components/SeoContentPage';
+import { setPageSeo } from './seo';
 
 export default function App() {
+  const pathname = window.location.pathname.replace(/\/$/, '') || '/';
   useEffect(() => {
-    const title = '1v1Vote - Live Public Figure Voting Dashboard';
-    const description = 'Vote once every 24 hours for public figures, creators, scholars, athletes, and leaders. No login required.';
-    const url = `${window.location.origin}/`;
-    document.title = title;
-    setMeta('name', 'description', description);
-    setMeta('property', 'og:title', title);
-    setMeta('property', 'og:description', description);
-    setMeta('property', 'og:url', url);
-    setMeta('name', 'twitter:title', title);
-    setMeta('name', 'twitter:description', description);
-    const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (canonical) canonical.href = url;
-    if (typeof window.gtag === 'function') {
-      window.gtag('event', 'page_view', { page_title: title, page_location: url, page_path: '/' });
-    }
-  }, []);
-
+    if (pathname === '/') setPageSeo('1v1Vote - Vote. Rank. Win.', 'Vote once every 24 hours for important public figures, leaders, scholars, athletes, and entertainers.', '/');
+  }, [pathname]);
+  if (pathname === '/admin') return <PeopleAdminPanel />;
+  const profileMatch = pathname.match(/^\/people\/([^/]+)$/);
+  if (profileMatch) return <PersonProfilePage slug={decodeURIComponent(profileMatch[1])} />;
+  if (SEO_PAGES[pathname]) return <SeoContentPage page={SEO_PAGES[pathname]} />;
   return <PeopleDashboard />;
 }
