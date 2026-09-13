@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronUp, Clock3, ExternalLink, Globe2, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote, Workflow } from 'lucide-react';
+import { Check, ChevronUp, Clock3, ExternalLink, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
-import { Person, PersonCategory, PersonCountry, PeopleAutomationStatus } from '../types';
+import { Person, PersonCategory, PersonCountry } from '../types';
+import { SiteFooter } from './SiteFooter';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
 const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Sports', 'Entertainment', 'Business'];
@@ -120,7 +121,6 @@ export const PeopleDashboard: React.FC = () => {
   const [cooldowns, setCooldowns] = useState<Record<string, string>>(() => readCooldowns());
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [automation, setAutomation] = useState<PeopleAutomationStatus | null>(null);
 
   const loadPeople = async () => {
     try {
@@ -136,21 +136,10 @@ export const PeopleDashboard: React.FC = () => {
     }
   };
 
-  const loadAutomationStatus = async () => {
-    try {
-      const response = await fetch('/api/automation/status', { cache: 'no-store' });
-      if (response.ok) setAutomation(await response.json() as PeopleAutomationStatus);
-    } catch {
-      // The profile feed remains usable if the status endpoint is unavailable.
-    }
-  };
-
   useEffect(() => {
     void loadPeople();
-    void loadAutomationStatus();
     const interval = window.setInterval(() => {
       void loadPeople();
-      void loadAutomationStatus();
     }, 15000);
     return () => window.clearInterval(interval);
   }, []);
@@ -248,11 +237,6 @@ export const PeopleDashboard: React.FC = () => {
             <div><div className="text-xl font-black text-white">{formatCount(totalVotes)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Total votes</div></div>
             <div><div className="text-xl font-black text-emerald-300">24h</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Vote reset</div></div>
           </div>
-          <div className="relative mt-6 flex max-w-2xl items-center gap-3 rounded-2xl border border-slate-700/70 bg-black/15 px-3 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-400/30 bg-sky-400/10 text-sky-300"><Workflow className="h-4 w-4" /></div>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-xs font-black text-white"><Globe2 className="h-3.5 w-3.5 text-emerald-300" /> Auto profile workflow</div><div className="mt-1 text-[10px] text-slate-500">{automation?.enabled ? 'Browser research, source verification, and AI discovery are active.' : 'Browser research, source verification, and public-source discovery are active.'}</div></div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${automation?.state === 'error' ? 'bg-red-400/15 text-red-300' : automation?.state === 'running' ? 'bg-amber-400/15 text-amber-200' : 'bg-emerald-400/15 text-emerald-300'}`}>{automation?.state === 'running' ? 'Running' : automation?.state === 'error' ? 'Needs attention' : 'Active'}</span>
-          </div>
         </section>
 
         <section className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -273,6 +257,7 @@ export const PeopleDashboard: React.FC = () => {
 
         <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/80 bg-[#0b1221]/70 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-sky-400" /> No account required. Vote once for each profile every 24 hours.</div><div className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Share any profile with its link.</div></div>
       </main>
+      <SiteFooter />
     </div>
   );
 };
