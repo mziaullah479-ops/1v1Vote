@@ -21,7 +21,7 @@ function safeEqual(left: string, right: string) {
 }
 
 function errorResponse(res: express.Response, error: unknown) {
-  if (error instanceof StoreError) return res.status(error.status).json({ error: error.message, code: error.code });
+  if (error instanceof StoreError) return res.status(error.status).json({ error: error.message, code: error.code, retryAt: error.retryAt });
   console.error(error);
   return res.status(500).json({ error: 'The server could not complete that request.' });
 }
@@ -67,12 +67,12 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     ? `${match.creator1.name} vs ${match.creator2.name} - 1v1Vote Live Arena`
     : pathname === '/request'
       ? 'Request a Creator Match - 1v1Vote'
-      : '1v1Vote - Live Creator Battles & Matchup Voting';
+      : '1v1Vote - Live Public Figure Voting Dashboard';
   const description = match
-    ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
-    : pathname === '/request'
-      ? 'Submit a verified creator matchup request for review on 1v1Vote.'
-      : '1v1Vote: Live head-to-head voting battles between top creators. Vote, share, and decide who rules the arena.';
+      ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
+      : pathname === '/request'
+        ? 'Submit a verified creator matchup request for review on 1v1Vote.'
+        : 'Vote once every 24 hours for public figures, creators, scholars, athletes, and leaders. No login required.';
 
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
@@ -146,6 +146,35 @@ async function startServer() {
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: '1v1Vote', database: 'ready', timestamp: new Date().toISOString() });
+  });
+
+  app.get('/api/people', (_req, res) => {
+    res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
+  });
+
+  app.get('/api/people/:personId', (req, res) => {
+    const person = store.getPerson(req.params.personId);
+    if (!person) return res.status(404).json({ error: 'Profile not found.' });
+    return res.json({ person });
+  });
+
+  app.post('/api/people/:personId/vote', async (req, res) => {
+    try {
+      const { identityKey } = getIdentity(req, res);
+      const person = await store.voteForPerson(req.params.personId, identityKey);
+      return res.json({ person, nextVoteAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/people/:personId/share', async (req, res) => {
+    try {
+      const person = await store.sharePerson(req.params.personId);
+      return res.json({ person });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
   });
 
   app.get('/api/matches', (req, res) => {
@@ -351,6 +380,15 @@ async function startServer() {
     }
   });
 
+  app.post('/api/admin/people/refresh', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json({ refreshed: await store.refreshPeopleProfiles(), people: store.getPeopleSnapshot() });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.post('/api/admin/backup', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -401,6 +439,14 @@ async function startServer() {
   }, 1000 * 60 * 60 * 6);
   backupTimer.unref?.();
 
+  const profileRefreshTimer = setInterval(() => {
+    store.refreshPeopleProfiles().catch((error) => console.error('Scheduled profile refresh failed:', error));
+  }, 1000 * 60 * 60 * 24);
+  profileRefreshTimer.unref?.();
+  setTimeout(() => {
+    store.refreshPeopleProfiles().catch((error) => console.error('Initial profile refresh failed:', error));
+  }, 5000).unref?.();
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
@@ -442,6 +488,7 @@ async function startServer() {
 
   const shutdown = async () => {
     clearInterval(backupTimer);
+    clearInterval(profileRefreshTimer);
     await store.backupNow().catch((error) => console.error('Shutdown backup failed:', error));
     server.close(() => process.exit(0));
   };
