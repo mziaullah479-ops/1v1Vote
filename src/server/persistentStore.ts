@@ -68,7 +68,7 @@ interface AuditEntry {
 }
 
 interface DatabaseState {
-  version: 2;
+  version: number;
   matches: Match[];
   people: Person[];
   comments: Record<string, Comment[]>;
@@ -198,7 +198,7 @@ function requestedCreator(input: unknown, fallbackColor: string): Match['creator
 
 function emptyState(): DatabaseState {
   return {
-    version: 2,
+    version: 3,
     matches: clone(INITIAL_MATCHES),
     people: clone(INITIAL_PEOPLE),
     comments: clone(INITIAL_COMMENTS),
@@ -216,6 +216,7 @@ function emptyState(): DatabaseState {
 
 function normalizeState(input: Partial<DatabaseState>): DatabaseState {
   const seeded = emptyState();
+  const resetPeopleActivity = input.version === 2;
   const storedMatches = Array.isArray(input.matches) ? input.matches : [];
   const storedPeople = Array.isArray(input.people) ? input.people : [];
   const mergedMatches = storedMatches.length
@@ -232,20 +233,20 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     : seeded.people;
   const canonicalNames = new Map(seeded.people.map((person) => [person.id, person.name]));
   return {
-    version: 2,
+    version: 3,
     matches: mergedMatches.map((match) => ({ ...match, views: match.views || 0, shares: match.shares || 0 })),
     people: mergedPeople.map((person) => ({
       ...person,
       name: canonicalNames.get(person.id) || person.name,
-      votes: person.votes || 0,
-      shares: person.shares || 0,
+      votes: resetPeopleActivity ? 0 : person.votes || 0,
+      shares: resetPeopleActivity ? 0 : person.shares || 0,
       updatedAt: person.updatedAt || nowIso(),
     })),
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
     votes: Array.isArray(input.votes) ? input.votes : [],
-    personVotes: Array.isArray(input.personVotes) ? input.personVotes : [],
+    personVotes: resetPeopleActivity ? [] : Array.isArray(input.personVotes) ? input.personVotes : [],
     likes: Array.isArray(input.likes) ? input.likes : [],
     commentLikes: Array.isArray(input.commentLikes) ? input.commentLikes : [],
     adminSessions: Array.isArray(input.adminSessions) ? input.adminSessions : [],
