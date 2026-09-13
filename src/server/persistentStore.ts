@@ -96,7 +96,10 @@ interface DiscoveryCandidate {
   popularity?: number;
 }
 
-const AUTO_PROFILE_BLOCKLIST = new Set(['all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective']);
+const AUTO_PROFILE_BLOCKLIST = new Set([
+  'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
+  'india-pakistan-relations', 'india-pakistan-war-of-1971',
+]);
 
 export class StoreError extends Error {
   constructor(public code: string, message: string, public status = 400, public retryAt?: string) {
@@ -153,6 +156,13 @@ function profileSlug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 80);
 }
 
+function looksLikePersonPage(name: string, bio: string) {
+  if (AUTO_PROFILE_BLOCKLIST.has(profileSlug(name))) return false;
+  if (/relations?|war|conflict|history|election|treaty|attack|incident|movement|organization|company|collective|band|film|album|song|tournament|championship|season|district|province|country|university|government/i.test(name)) return false;
+  if (/^(?:the )?(?:relations?|war|conflict|history|election|treaty|attack|incident)\b/i.test(bio)) return false;
+  return /\b(actor|actress|athlete|businessman|businesswoman|ceo|comedian|cricketer|creator|entrepreneur|footballer|imam|influencer|journalist|minister|politician|president|professor|rapper|scholar|singer|streamer|writer|youtuber|born|died)\b/i.test(bio);
+}
+
 async function discoverWithGemini(apiKey: string, existingNames: string[]) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
     method: 'POST',
@@ -198,7 +208,7 @@ async function discoverFromWikipedia(existingNames: string[]) {
       const bio = page.extract?.replace(/\s+/g, ' ').trim() || '';
       const imageUrl = page.original?.source || page.thumbnail?.source || '';
       const slug = profileSlug(name);
-      if (name.length < 2 || /^list of|people from|politics of/i.test(name) || AUTO_PROFILE_BLOCKLIST.has(slug) || /collective|company|band/i.test(name) || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
+       if (name.length < 2 || /^list of|people from|politics of/i.test(name) || !looksLikePersonPage(name, bio) || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
       results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl, popularity: Object.values(page.pageviews || {}).reduce((sum, value) => sum + (value || 0), 0) });
       existing.add(name.toLowerCase());
     }
