@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronUp, Clock3, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
+import { Check, ChevronUp, Clock3, ExternalLink, Globe2, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote, Workflow } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
-import { Person, PersonCategory, PersonCountry } from '../types';
+import { Person, PersonCategory, PersonCountry, PeopleAutomationStatus } from '../types';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
 const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Creator', 'Sports', 'Entertainment', 'Business'];
@@ -82,7 +82,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
         {rank <= 3 && <Trophy className="h-5 w-5 shrink-0 text-amber-300" aria-label="Top ranked" />}
       </div>
 
-      <p className="relative mt-4 min-h-10 text-xs leading-relaxed text-slate-400">{person.shortBio}</p>
+      <p className="relative mt-4 min-h-10 line-clamp-3 text-xs leading-relaxed text-slate-400">{person.bio || person.shortBio}</p>
 
       <div className="relative mt-4 flex items-end justify-between border-t border-slate-800/80 pt-3">
         <div>
@@ -91,7 +91,10 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
           </div>
           <div className="mt-1 text-2xl font-black tracking-tight text-white">{formatCount(person.votes)}</div>
         </div>
-        {person.followersCount && <span className="text-right text-[10px] font-bold text-slate-500">{person.followersCount}<br />followers</span>}
+        <div className="flex items-end gap-3">
+          {person.followersCount && <span className="text-right text-[10px] font-bold text-slate-500">{person.followersCount}<br />followers</span>}
+          {person.profileUrl && <a href={person.profileUrl} target="_blank" rel="noreferrer" aria-label={`Open source profile for ${person.name}`} className="text-slate-500 transition hover:text-sky-300"><ExternalLink className="h-4 w-4" /></a>}
+        </div>
       </div>
 
       <div className="relative mt-4 grid grid-cols-[1fr_auto] gap-2">
@@ -116,6 +119,7 @@ export const PeopleDashboard: React.FC = () => {
   const [cooldowns, setCooldowns] = useState<Record<string, string>>(() => readCooldowns());
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [automation, setAutomation] = useState<PeopleAutomationStatus | null>(null);
 
   const loadPeople = async () => {
     try {
@@ -131,9 +135,22 @@ export const PeopleDashboard: React.FC = () => {
     }
   };
 
+  const loadAutomationStatus = async () => {
+    try {
+      const response = await fetch('/api/automation/status', { cache: 'no-store' });
+      if (response.ok) setAutomation(await response.json() as PeopleAutomationStatus);
+    } catch {
+      // The profile feed remains usable if the status endpoint is unavailable.
+    }
+  };
+
   useEffect(() => {
     void loadPeople();
-    const interval = window.setInterval(() => void loadPeople(), 15000);
+    void loadAutomationStatus();
+    const interval = window.setInterval(() => {
+      void loadPeople();
+      void loadAutomationStatus();
+    }, 15000);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -218,7 +235,7 @@ export const PeopleDashboard: React.FC = () => {
           <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
           <div className="relative max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> One person, one vote every 24 hours</div>
-            <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">لوگوں کی پسند، live ranking کے ساتھ</h1>
+            <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">Public opinion, ranked live</h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">Vote for any public figure you support. No login, no profile, no competition brackets. Every profile has one vote per device every 24 hours, and the most-voted people rise to the top.</p>
           </div>
           <div className="relative mt-7 grid grid-cols-3 gap-2 border-t border-slate-800/80 pt-5 sm:max-w-xl sm:gap-8">
@@ -226,10 +243,15 @@ export const PeopleDashboard: React.FC = () => {
             <div><div className="text-xl font-black text-white">{formatCount(totalVotes)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Total votes</div></div>
             <div><div className="text-xl font-black text-emerald-300">24h</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Vote reset</div></div>
           </div>
+          <div className="relative mt-6 flex max-w-2xl items-center gap-3 rounded-2xl border border-slate-700/70 bg-black/15 px-3 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-400/30 bg-sky-400/10 text-sky-300"><Workflow className="h-4 w-4" /></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-xs font-black text-white"><Globe2 className="h-3.5 w-3.5 text-emerald-300" /> Auto profile workflow</div><div className="mt-1 text-[10px] text-slate-500">{automation?.enabled ? 'Browser research, source verification, and AI discovery are active.' : 'Public-source research and profile refresh are active.'}</div></div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${automation?.state === 'error' ? 'bg-red-400/15 text-red-300' : automation?.state === 'running' ? 'bg-amber-400/15 text-amber-200' : 'bg-emerald-400/15 text-emerald-300'}`}>{automation?.state === 'running' ? 'Running' : automation?.state === 'error' ? 'Needs attention' : 'Active'}</span>
+          </div>
         </section>
 
         <section className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div><h2 className="text-2xl font-black text-white">Most voted people</h2><p className="mt-1 text-xs text-slate-500">ایک ہی dashboard، پاکستان اور دنیا بھر کی نمایاں شخصیات</p></div>
+          <div><h2 className="text-2xl font-black text-white">Most voted people</h2><p className="mt-1 text-xs text-slate-500">One dashboard for notable people from Pakistan and around the world</p></div>
           <div className="relative w-full lg:max-w-xs"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a profile" className="min-h-11 w-full rounded-xl border border-slate-800 bg-[#0b1221] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-500/70" /></div>
         </section>
 
@@ -249,4 +271,3 @@ export const PeopleDashboard: React.FC = () => {
     </div>
   );
 };
-
