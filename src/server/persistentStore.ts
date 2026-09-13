@@ -92,6 +92,7 @@ interface DiscoveryCandidate {
   bio?: string;
   profileUrl?: string;
   platform?: string;
+  imageUrl?: string;
 }
 
 export class StoreError extends Error {
@@ -166,6 +167,39 @@ async function discoverWithGemini(apiKey: string, existingNames: string[]) {
   if (!json) throw new Error('Research provider returned no profile list.');
   const candidates = JSON.parse(json) as unknown;
   return Array.isArray(candidates) ? candidates as DiscoveryCandidate[] : [];
+}
+
+async function discoverFromWikipedia(existingNames: string[]) {
+  const sources = [
+    { category: 'Category:Pakistani politicians', country: 'Pakistan', type: 'Politics' },
+    { category: 'Category:Pakistani religious leaders', country: 'Pakistan', type: 'Religious Scholar' },
+    { category: 'Category:Pakistani YouTubers', country: 'Pakistan', type: 'Creator' },
+    { category: 'Category:Indian actors', country: 'India', type: 'Entertainment' },
+    { category: 'Category:Indian cricketers', country: 'India', type: 'Sports' },
+    { category: 'Category:American YouTubers', country: 'USA', type: 'Creator' },
+  ] as const;
+  const existing = new Set(existingNames.map((name) => name.toLowerCase()));
+  const results: DiscoveryCandidate[] = [];
+  await Promise.all(sources.map(async (source) => {
+    const params = new URLSearchParams({
+      action: 'query', format: 'json', origin: '*', generator: 'categorymembers',
+      gcmtitle: source.category, gcmtype: 'page', gcmlimit: '8', prop: 'extracts|pageimages|info',
+      exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
+    });
+    const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
+    if (!response.ok) return;
+    const payload = await response.json() as { query?: { pages?: Record<string, { title?: string; extract?: string; fullurl?: string; original?: { source?: string }; thumbnail?: { source?: string } }> } };
+    for (const page of Object.values(payload.query?.pages || {})) {
+      const name = page.title?.trim() || '';
+      const profileUrl = page.fullurl || '';
+      const bio = page.extract?.replace(/\s+/g, ' ').trim() || '';
+      const imageUrl = page.original?.source || page.thumbnail?.source || '';
+      if (name.length < 2 || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
+      results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl });
+      existing.add(name.toLowerCase());
+    }
+  }));
+  return results;
 }
 
 function tokenHash(token: string) {
@@ -265,7 +299,7 @@ function emptyState(): DatabaseState {
     peopleAutomation: {
       enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
       state: process.env.GEMINI_API_KEY?.trim() ? 'idle' : 'source-refresh',
-      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Public source refresh',
+      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
       lastRefreshed: 0,
       lastPublished: 0,
     },
@@ -314,7 +348,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
       ...seeded.peopleAutomation,
       ...(input.peopleAutomation || {}),
       enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
-      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Public source refresh',
+      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
     },
   };
 }
@@ -510,9 +544,10 @@ export class PersistentStore {
 
   private async discoverPeople() {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) return 0;
     const existingNames = this.state.people.map((person) => person.name);
-    const candidates = await discoverWithGemini(apiKey, existingNames);
+    const candidates = apiKey
+      ? await discoverWithGemini(apiKey, existingNames)
+      : await discoverFromWikipedia(existingNames);
     const existingKeys = new Set(this.state.people.flatMap((person) => [person.name.toLowerCase(), person.slug.toLowerCase(), person.profileUrl?.toLowerCase() || '']));
     const categories = new Set(['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business']);
     const countries = new Set(['Pakistan', 'India', 'USA', 'Global']);
@@ -535,9 +570,9 @@ export class PersistentStore {
         const researched = socialHosts.test(profileUrl)
           ? await scrapeSocialProfile(profileUrl, candidateName)
           : await fetchPublicProfileSummary(profileUrl);
-        const image = ('avatarUrl' in researched ? researched.avatarUrl : researched.avatar) || '';
+        const image = candidate.imageUrl || (('avatarUrl' in researched ? researched.avatarUrl : researched.avatar) || '');
         if (!(await isUsableImage(image))) continue;
-        const name = ('name' in researched && researched.name) || candidateName;
+        const name = socialHosts.test(profileUrl) ? (('name' in researched && researched.name) || candidateName) : candidateName;
         const slug = profileSlug(name);
         if (!slug || existingKeys.has(slug) || existingKeys.has(name.toLowerCase())) continue;
         const category = categories.has(String(candidate.category)) ? String(candidate.category) as Person['category'] : 'Public Figure';
@@ -579,7 +614,7 @@ export class PersistentStore {
   async runPeopleAutomation(force = false) {
     const current = this.state.peopleAutomation;
     if (this.peopleAutomationBusy) return this.getAutomationStatus();
-    if (!force && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
+    if (!force && current.lastRunAt && current.lastPublished > 0 && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
       return this.getAutomationStatus();
     }
     this.peopleAutomationBusy = true;
@@ -589,8 +624,8 @@ export class PersistentStore {
       const refreshed = await this.refreshPeopleProfiles();
       const published = await this.discoverPeople();
       current.enabled = Boolean(process.env.GEMINI_API_KEY?.trim());
-      current.provider = current.enabled ? 'Google Search + Gemini' : 'Public source refresh';
-      current.state = current.enabled ? 'active' : 'source-refresh';
+      current.provider = current.enabled ? 'Google Search + Gemini' : 'Wikipedia public sources';
+      current.state = 'active';
       current.lastRunAt = nowIso();
       current.lastRefreshed = refreshed;
       current.lastPublished = published;
