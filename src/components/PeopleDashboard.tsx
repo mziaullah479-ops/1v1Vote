@@ -216,7 +216,7 @@ export const PeopleDashboard: React.FC = () => {
     const rankQuery = query.match(/(?:rank|number|#)?\s*(\d+)/)?.[1];
     const rank = people.findIndex((item) => item.id === person.id) + 1;
     const matchesRank = Boolean(rankQuery && Number(rankQuery) === rank);
-    const matchesSearch = !query || matchesRank || `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query);
+    const matchesSearch = !query || (rankQuery ? matchesRank : `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query));
     return matchesSearch && (category === 'All' || person.category === category) && (country === 'All' || person.country === country);
   });
   const totalVotes = people.reduce((sum, person) => sum + person.votes, 0);
