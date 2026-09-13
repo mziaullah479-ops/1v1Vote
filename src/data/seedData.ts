@@ -1,4 +1,4 @@
-import { Match, Comment } from '../types';
+import { Match, Comment, Person } from '../types';
 
 export const INITIAL_MATCHES: Match[] = [
   {
@@ -645,3 +645,111 @@ export const INITIAL_COMMENTS: Record<string, Comment[]> = {
     },
   ],
 };
+
+const personAvatar = (name: string, color = '0f172a') =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${color}&color=38bdf8&size=256&bold=true`;
+
+export const INITIAL_PEOPLE: Person[] = [
+  {
+    id: 'person-mufti-taqi-usmani', slug: 'mufti-taqi-usmani', name: 'Mufti Taqi Usmani',
+    shortBio: 'Pakistani Islamic scholar, jurist, and author.', category: 'Religious Scholar', country: 'Pakistan',
+    avatar: personAvatar('Mufti Taqi Usmani', '172554'), profileUrl: 'https://en.wikipedia.org/wiki/Muhammad_Taqi_Usmani', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-fazlur-rehman', slug: 'maulana-fazlur-rehman', name: 'Maulana Fazlur Rehman',
+    shortBio: 'Pakistani religious scholar and public political figure.', category: 'Religious Scholar', country: 'Pakistan',
+    avatar: personAvatar('Fazlur Rehman', '172554'), profileUrl: 'https://en.wikipedia.org/wiki/Fazal-ur-Rehman_(politician)', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-shehbaz-sharif', slug: 'shehbaz-sharif', name: 'Shehbaz Sharif',
+    shortBio: 'Pakistani public figure and political leader.', category: 'Politics', country: 'Pakistan',
+    avatar: personAvatar('Shehbaz Sharif', '172554'), profileUrl: 'https://en.wikipedia.org/wiki/Shehbaz_Sharif', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-maryam-nawaz', slug: 'maryam-nawaz', name: 'Maryam Nawaz Sharif',
+    shortBio: 'Pakistani political leader and public figure.', category: 'Politics', country: 'Pakistan',
+    avatar: personAvatar('Maryam Nawaz', '172554'), profileUrl: 'https://en.wikipedia.org/wiki/Maryam_Nawaz', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-imran-khan', slug: 'imran-khan', name: 'Imran Khan',
+    shortBio: 'Pakistani political leader, author, and former international cricketer.', category: 'Politics', country: 'Pakistan',
+    avatar: personAvatar('Imran Khan', '172554'), profileUrl: 'https://en.wikipedia.org/wiki/Imran_Khan', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-ducky-bhai', slug: 'ducky-bhai', name: 'Ducky Bhai',
+    shortBio: 'Pakistani YouTube creator and entertainer.', category: 'Creator', country: 'Pakistan', platform: 'YouTube',
+    avatar: personAvatar('Ducky Bhai', '0c4a6e'), profileUrl: 'https://youtube.com/@duckybhai', researchUrl: 'https://youtube.com/@duckybhai', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-junaid-akram', slug: 'junaid-akram', name: 'Junaid Akram',
+    shortBio: 'Pakistani comedian, podcaster, and content creator.', category: 'Creator', country: 'Pakistan', platform: 'YouTube',
+    avatar: personAvatar('Junaid Akram', '0c4a6e'), profileUrl: 'https://youtube.com/@junaidakram', researchUrl: 'https://youtube.com/@junaidakram', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-irfan-junejo', slug: 'irfan-junejo', name: 'Irfan Junejo',
+    shortBio: 'Pakistani filmmaker, vlogger, and storyteller.', category: 'Creator', country: 'Pakistan', platform: 'YouTube',
+    avatar: personAvatar('Irfan Junejo', '0c4a6e'), profileUrl: 'https://youtube.com/@IrfanJunejo', researchUrl: 'https://youtube.com/@IrfanJunejo', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-mrbeast', slug: 'mrbeast', name: 'MrBeast',
+    shortBio: 'American creator, philanthropist, and entrepreneur.', category: 'Creator', country: 'USA', platform: 'YouTube',
+    avatar: personAvatar('MrBeast', '0c4a6e'), profileUrl: 'https://youtube.com/@MrBeast', researchUrl: 'https://youtube.com/@MrBeast', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-ishowspeed', slug: 'ishowspeed', name: 'IShowSpeed',
+    shortBio: 'American streamer and entertainment creator.', category: 'Creator', country: 'USA', platform: 'YouTube',
+    avatar: personAvatar('IShowSpeed', '0c4a6e'), profileUrl: 'https://youtube.com/@IShowSpeed', researchUrl: 'https://youtube.com/@IShowSpeed', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-virat-kohli', slug: 'virat-kohli', name: 'Virat Kohli',
+    shortBio: 'Indian international cricketer and public figure.', category: 'Sports', country: 'India',
+    avatar: personAvatar('Virat Kohli', '7c2d12'), profileUrl: 'https://en.wikipedia.org/wiki/Virat_Kohli', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-narendra-modi', slug: 'narendra-modi', name: 'Narendra Modi',
+    shortBio: 'Indian public figure and political leader.', category: 'Politics', country: 'India',
+    avatar: personAvatar('Narendra Modi', '7c2d12'), profileUrl: 'https://en.wikipedia.org/wiki/Narendra_Modi', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-shah-rukh-khan', slug: 'shah-rukh-khan', name: 'Shah Rukh Khan',
+    shortBio: 'Indian actor, producer, and global entertainment figure.', category: 'Entertainment', country: 'India',
+    avatar: personAvatar('Shah Rukh Khan', '7c2d12'), profileUrl: 'https://en.wikipedia.org/wiki/Shah_Rukh_Khan', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-cristiano-ronaldo', slug: 'cristiano-ronaldo', name: 'Cristiano Ronaldo',
+    shortBio: 'Portuguese footballer and one of the world’s most followed athletes.', category: 'Sports', country: 'Global',
+    avatar: personAvatar('Cristiano Ronaldo', '14532d'), profileUrl: 'https://en.wikipedia.org/wiki/Cristiano_Ronaldo', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-taylor-swift', slug: 'taylor-swift', name: 'Taylor Swift',
+    shortBio: 'American singer-songwriter and global entertainment figure.', category: 'Entertainment', country: 'USA',
+    avatar: personAvatar('Taylor Swift', '14532d'), profileUrl: 'https://en.wikipedia.org/wiki/Taylor_Swift', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-elon-musk', slug: 'elon-musk', name: 'Elon Musk',
+    shortBio: 'Technology entrepreneur and business leader.', category: 'Business', country: 'USA',
+    avatar: personAvatar('Elon Musk', '14532d'), profileUrl: 'https://en.wikipedia.org/wiki/Elon_Musk', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'person-zakir-naik', slug: 'zakir-naik', name: 'Dr Zakir Naik',
+    shortBio: 'Indian Islamic preacher, speaker, and public figure.', category: 'Religious Scholar', country: 'Global',
+    avatar: personAvatar('Zakir Naik', '172554'), profileUrl: 'https://en.wikipedia.org/wiki/Zakir_Naik', verified: true,
+    votes: 0, shares: 0, updatedAt: new Date().toISOString(),
+  },
+];
