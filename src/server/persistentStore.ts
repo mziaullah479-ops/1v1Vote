@@ -96,7 +96,7 @@ interface DiscoveryCandidate {
   popularity?: number;
 }
 
-const AUTO_PROFILE_BLOCKLIST = new Set(['all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh']);
+const AUTO_PROFILE_BLOCKLIST = new Set(['all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective']);
 
 export class StoreError extends Error {
   constructor(public code: string, message: string, public status = 400, public retryAt?: string) {
@@ -174,19 +174,19 @@ async function discoverWithGemini(apiKey: string, existingNames: string[]) {
 
 async function discoverFromWikipedia(existingNames: string[]) {
   const sources = [
-    { category: 'Category:Pakistani politicians', country: 'Pakistan', type: 'Politics' },
-    { category: 'Category:Pakistani religious leaders', country: 'Pakistan', type: 'Religious Scholar' },
-    { category: 'Category:Pakistani YouTubers', country: 'Pakistan', type: 'Creator' },
-    { category: 'Category:Indian actors', country: 'India', type: 'Entertainment' },
-    { category: 'Category:Indian cricketers', country: 'India', type: 'Sports' },
-    { category: 'Category:American YouTubers', country: 'USA', type: 'Creator' },
+    { query: 'notable Pakistani politicians', country: 'Pakistan', type: 'Politics' },
+    { query: 'notable Pakistani Islamic scholars', country: 'Pakistan', type: 'Religious Scholar' },
+    { query: 'notable Pakistani YouTubers', country: 'Pakistan', type: 'Creator' },
+    { query: 'notable Indian actors', country: 'India', type: 'Entertainment' },
+    { query: 'notable Indian cricketers', country: 'India', type: 'Sports' },
+    { query: 'notable American YouTubers', country: 'USA', type: 'Creator' },
   ] as const;
   const existing = new Set(existingNames.map((name) => name.toLowerCase()));
   const results: DiscoveryCandidate[] = [];
   await Promise.all(sources.map(async (source) => {
     const params = new URLSearchParams({
-      action: 'query', format: 'json', origin: '*', generator: 'categorymembers',
-      gcmtitle: source.category, gcmtype: 'page', gcmlimit: '30', prop: 'extracts|pageimages|info|pageviews',
+      action: 'query', format: 'json', origin: '*', generator: 'search',
+      gsrsearch: source.query, gsrlimit: '12', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
       exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
     });
     const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
@@ -197,7 +197,8 @@ async function discoverFromWikipedia(existingNames: string[]) {
       const profileUrl = page.fullurl || '';
       const bio = page.extract?.replace(/\s+/g, ' ').trim() || '';
       const imageUrl = page.original?.source || page.thumbnail?.source || '';
-      if (name.length < 2 || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
+      const slug = profileSlug(name);
+      if (name.length < 2 || /^list of|people from|politics of/i.test(name) || AUTO_PROFILE_BLOCKLIST.has(slug) || /collective|company|band/i.test(name) || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
       results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl, popularity: Object.values(page.pageviews || {}).reduce((sum, value) => sum + (value || 0), 0) });
       existing.add(name.toLowerCase());
     }
@@ -305,7 +306,7 @@ function emptyState(): DatabaseState {
       provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
       lastRefreshed: 0,
       lastPublished: 0,
-      discoveryVersion: 1,
+      discoveryVersion: 3,
     },
   };
 }
@@ -618,7 +619,7 @@ export class PersistentStore {
   async runPeopleAutomation(force = false) {
     const current = this.state.peopleAutomation;
     if (this.peopleAutomationBusy) return this.getAutomationStatus();
-    if (!force && current.discoveryVersion === 2 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
+    if (!force && current.discoveryVersion === 3 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
       return this.getAutomationStatus();
     }
     this.peopleAutomationBusy = true;
@@ -633,7 +634,7 @@ export class PersistentStore {
       current.lastRunAt = nowIso();
       current.lastRefreshed = refreshed;
       current.lastPublished = published;
-      current.discoveryVersion = 2;
+      current.discoveryVersion = 3;
       current.nextRunAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     } catch (error) {
       current.state = 'error';
