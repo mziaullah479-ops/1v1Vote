@@ -92,7 +92,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
       ? 'Submit a verified creator matchup request for review on 1v1Vote.'
       : staticTitles[pathname]
         ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
-      : 'Vote once every 24 hours for public figures, creators, scholars, athletes, and leaders. No login required.';
+      : 'Vote every 24 hours for public figures, leaders, scholars, athletes, artists, and entrepreneurs. No login required.';
 
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
