@@ -305,6 +305,7 @@ function emptyState(): DatabaseState {
       provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
       lastRefreshed: 0,
       lastPublished: 0,
+      discoveryVersion: 1,
     },
   };
 }
@@ -617,7 +618,7 @@ export class PersistentStore {
   async runPeopleAutomation(force = false) {
     const current = this.state.peopleAutomation;
     if (this.peopleAutomationBusy) return this.getAutomationStatus();
-    if (!force && current.lastRunAt && current.lastPublished > 0 && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
+    if (!force && current.discoveryVersion === 2 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
       return this.getAutomationStatus();
     }
     this.peopleAutomationBusy = true;
@@ -632,6 +633,7 @@ export class PersistentStore {
       current.lastRunAt = nowIso();
       current.lastRefreshed = refreshed;
       current.lastPublished = published;
+      current.discoveryVersion = 2;
       current.nextRunAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     } catch (error) {
       current.state = 'error';
