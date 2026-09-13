@@ -13,6 +13,7 @@ export interface PeopleAutomationStatus {
   lastRunAt?: string;
   lastRefreshed: number;
   lastPublished: number;
+  discoveryVersion?: number;
   lastError?: string;
   nextRunAt?: string;
 }
