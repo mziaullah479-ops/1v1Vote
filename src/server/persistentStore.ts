@@ -413,7 +413,7 @@ export class PersistentStore {
         const result = isSocialProfile
           ? await scrapeSocialProfile(researchUrl, person.name)
           : await fetchPublicProfileSummary(researchUrl);
-        person.name = result.name || person.name;
+        if (isSocialProfile) person.name = result.name || person.name;
         if ('shortBio' in result) person.shortBio = result.shortBio || person.shortBio;
         person.avatar = ('avatarUrl' in result ? result.avatarUrl : result.avatar) || person.avatar;
         person.profileUrl = ('profileUrl' in result ? result.profileUrl : person.profileUrl) || person.profileUrl;
