@@ -1,7 +1,6 @@
 {
   "name": "1v1Vote",
-  "description": "Live head-to-head creator voting battles between top YouTubers, TikTokers, and social media influencers with real-time stock-style voting charts.",
+  "description": "Live public-figure voting, source-backed profiles, and transparent rankings for important people around the world.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
-

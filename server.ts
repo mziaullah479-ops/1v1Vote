@@ -60,19 +60,39 @@ function replaceMeta(html: string, attribute: 'name' | 'property', key: string, 
   return html.replace(pattern, (_match, prefix: string, suffix: string) => `${prefix}${escapeHtml(content)}${suffix}`);
 }
 
-function applyServerSeo(html: string, pathname: string, match?: import('./src/types').Match) {
+function applyServerSeo(html: string, pathname: string, match?: import('./src/types').Match, person?: import('./src/types').Person) {
   const origin = siteOrigin();
   const url = `${origin}${pathname === '/' ? '/' : pathname}`;
-  const title = match
+  const staticTitles: Record<string, string> = {
+    '/about': 'About 1v1Vote', '/how-it-works': 'How 1v1Vote Works', '/rankings': 'Live Public Figure Rankings', '/people': 'Important People Directory',
+    '/vote': 'Vote for Public Figures', '/discover': 'Discover Public Figures', '/profiles': 'Public Figure Profiles', '/sources': 'Profile Sources',
+    '/editorial-policy': 'Editorial Policy', '/data-safety': 'Data Safety', '/privacy': 'Privacy Policy', '/terms': 'Terms of Use', '/faq': '1v1Vote FAQ',
+    '/contact': 'Contact 1v1Vote', '/pakistan': 'Pakistani Public Figures', '/india': 'Indian Public Figures', '/usa': 'American Public Figures',
+    '/global': 'Global Public Figures', '/politics': 'Political Leaders', '/religious-scholars': 'Religious Scholars', '/sports': 'Sports Figures',
+    '/entertainment': 'Entertainment Figures', '/business': 'Business Leaders',
+    '/public-figures': 'Public Figures Directory', '/leaders': 'Leaders and Public Voices', '/scholars': 'Scholars Directory', '/athletes': 'Athletes Directory',
+    '/actors': 'Actors and Entertainers', '/entrepreneurs': 'Entrepreneurs Directory', '/pakistani-leaders': 'Pakistani Leaders', '/pakistani-scholars': 'Pakistani Scholars',
+    '/international-stars': 'International Public Figures', '/vote-guide': '1v1Vote Voting Guide',
+    '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map',
+  };
+  const title = person
+    ? `${person.name} Vote Ranking - 1v1Vote`
+    : match
     ? `${match.creator1.name} vs ${match.creator2.name} - 1v1Vote Live Arena`
     : pathname === '/request'
       ? 'Request a Creator Match - 1v1Vote'
-      : '1v1Vote - Live Public Figure Voting Dashboard';
-  const description = match
-      ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
-      : pathname === '/request'
-        ? 'Submit a verified creator matchup request for review on 1v1Vote.'
-        : 'Vote once every 24 hours for public figures, creators, scholars, athletes, and leaders. No login required.';
+      : staticTitles[pathname]
+        ? `${staticTitles[pathname]} - 1v1Vote`
+        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Vote & Rank Public Figures';
+  const description = person
+    ? `Read about ${person.name}, view the source profile, and vote in the live 1v1Vote ranking.`
+    : match
+    ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
+    : pathname === '/request'
+      ? 'Submit a verified creator matchup request for review on 1v1Vote.'
+      : staticTitles[pathname]
+        ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
+      : 'Vote once every 24 hours for public figures, creators, scholars, athletes, and leaders. No login required.';
 
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
@@ -81,6 +101,12 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
   result = replaceMeta(result, 'property', 'og:url', url);
   result = replaceMeta(result, 'name', 'twitter:title', title);
   result = replaceMeta(result, 'name', 'twitter:description', description);
+  if (person) {
+    result = replaceMeta(result, 'property', 'og:image', person.avatar);
+    result = replaceMeta(result, 'name', 'twitter:image', person.avatar);
+    const jsonLd = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Person', name: person.name, description: person.bio || person.shortBio, image: person.avatar, url }).replace(/</g, '\\u003c');
+    result = result.replace('</head>', `<script type="application/ld+json">${jsonLd}</script></head>`);
+  }
   result = result.replace(/<link rel=\"canonical\" href=\"[^\"]*\"\s*\/>/i, `<link rel=\"canonical\" href=\"${escapeHtml(url)}\" />`);
   return result;
 }
@@ -327,6 +353,47 @@ async function startServer() {
     return res.json({ requests: store.getMatchRequests() });
   });
 
+  app.get('/api/admin/people', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ people: store.getAdminPeopleSnapshot() });
+  });
+
+  app.post('/api/admin/people', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.status(201).json({ person: await store.createPerson(req.body || {}) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.put('/api/admin/people/:personId', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json({ person: await store.updatePerson(req.params.personId, req.body || {}) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.delete('/api/admin/people/:personId', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json({ person: await store.archivePerson(req.params.personId) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/admin/people/:personId/restore', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json({ person: await store.restorePerson(req.params.personId) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.post('/api/admin/match-requests/:requestId/review', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -463,24 +530,27 @@ async function startServer() {
       const runtimeConfig = JSON.stringify({
         gaMeasurementId: measurementId || undefined,
         gtmId: process.env.VITE_GTM_CONTAINER_ID?.trim() || undefined,
-        adsenseClientId: process.env.VITE_ADSENSE_CLIENT_ID?.trim() || undefined,
-        adsenseSlots: {
-          'header-banner': process.env.VITE_ADSENSE_SLOT_HEADER_BANNER?.trim() || undefined,
-          'in-content': process.env.VITE_ADSENSE_SLOT_IN_CONTENT?.trim() || undefined,
-          sidebar: process.env.VITE_ADSENSE_SLOT_SIDEBAR?.trim() || undefined,
-          'footer-banner': process.env.VITE_ADSENSE_SLOT_FOOTER_BANNER?.trim() || undefined,
-        },
+        adsenseClientId: undefined,
+        adsenseSlots: {},
       });
       const requestedPath = req.path || '/';
-      let match: import('./src/types').Match | undefined;
-      if (requestedPath.startsWith('/vs/')) {
+       let match: import('./src/types').Match | undefined;
+       let person: import('./src/types').Person | undefined;
+       if (requestedPath.startsWith('/vs/')) {
         try {
           match = store.getMatch(decodeURIComponent(requestedPath.slice('/vs/'.length)));
         } catch {
           match = undefined;
         }
-      }
-      const html = applyServerSeo(fs.readFileSync(indexPath, 'utf8'), requestedPath, match)
+       }
+       if (requestedPath.startsWith('/people/')) {
+         try {
+           person = store.getPerson(decodeURIComponent(requestedPath.slice('/people/'.length)));
+         } catch {
+           person = undefined;
+         }
+       }
+       const html = applyServerSeo(fs.readFileSync(indexPath, 'utf8'), requestedPath, match, person)
         .replace('</head>', `<script>window.__RUNTIME_CONFIG__=${runtimeConfig};</script></head>`);
       return res.type('html').send(html);
     });
