@@ -4,12 +4,25 @@ export type MatchRequestStatus = 'pending' | 'approved' | 'rejected';
 export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
 export type PersonCategory = 'Public Figure' | 'Religious Scholar' | 'Politics' | 'Creator' | 'Sports' | 'Entertainment' | 'Business';
 export type PersonCountry = 'Pakistan' | 'India' | 'USA' | 'Global';
+export type PeopleAutomationState = 'idle' | 'running' | 'active' | 'source-refresh' | 'error';
+
+export interface PeopleAutomationStatus {
+  enabled: boolean;
+  state: PeopleAutomationState;
+  provider: string;
+  lastRunAt?: string;
+  lastRefreshed: number;
+  lastPublished: number;
+  lastError?: string;
+  nextRunAt?: string;
+}
 
 export interface Person {
   id: string;
   slug: string;
   name: string;
   shortBio: string;
+  bio?: string;
   category: PersonCategory;
   country: PersonCountry;
   avatar: string;
