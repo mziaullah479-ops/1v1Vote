@@ -152,6 +152,10 @@ async function startServer() {
     res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
   });
 
+  app.get('/api/automation/status', (_req, res) => {
+    res.json(store.getAutomationStatus());
+  });
+
   app.get('/api/people/:personId', (req, res) => {
     const person = store.getPerson(req.params.personId);
     if (!person) return res.status(404).json({ error: 'Profile not found.' });
@@ -383,7 +387,7 @@ async function startServer() {
   app.post('/api/admin/people/refresh', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
-      return res.json({ refreshed: await store.refreshPeopleProfiles(), people: store.getPeopleSnapshot() });
+      return res.json({ automation: await store.runPeopleAutomation(true), people: store.getPeopleSnapshot() });
     } catch (error) {
       return errorResponse(res, error);
     }
@@ -440,11 +444,11 @@ async function startServer() {
   backupTimer.unref?.();
 
   const profileRefreshTimer = setInterval(() => {
-    store.refreshPeopleProfiles().catch((error) => console.error('Scheduled profile refresh failed:', error));
+    store.runPeopleAutomation().catch((error) => console.error('Scheduled profile automation failed:', error));
   }, 1000 * 60 * 60 * 24);
   profileRefreshTimer.unref?.();
   setTimeout(() => {
-    store.refreshPeopleProfiles().catch((error) => console.error('Initial profile refresh failed:', error));
+    store.runPeopleAutomation().catch((error) => console.error('Initial profile automation failed:', error));
   }, 5000).unref?.();
 
   if (process.env.NODE_ENV !== 'production') {
