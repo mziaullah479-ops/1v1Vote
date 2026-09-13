@@ -4,6 +4,7 @@ import { PeopleAdminPanel } from './components/PeopleAdminPanel';
 import { PersonProfilePage } from './components/PersonProfilePage';
 import { SeoContentPage, SEO_PAGES } from './components/SeoContentPage';
 import { setPageSeo } from './seo';
+import { SiteFooter } from './components/SiteFooter';
 
 export default function App() {
   const pathname = window.location.pathname.replace(/\/$/, '') || '/';
@@ -12,7 +13,7 @@ export default function App() {
   }, [pathname]);
   if (pathname === '/admin') return <PeopleAdminPanel />;
   const profileMatch = pathname.match(/^\/people\/([^/]+)$/);
-  if (profileMatch) return <PersonProfilePage slug={decodeURIComponent(profileMatch[1])} />;
-  if (SEO_PAGES[pathname]) return <SeoContentPage page={SEO_PAGES[pathname]} />;
+  if (profileMatch) return <><PersonProfilePage slug={decodeURIComponent(profileMatch[1])} /><SiteFooter /></>;
+  if (SEO_PAGES[pathname]) return <><SeoContentPage page={SEO_PAGES[pathname]} /><SiteFooter /></>;
   return <PeopleDashboard />;
 }
