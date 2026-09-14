@@ -6,7 +6,7 @@ import { SiteFooter } from './SiteFooter';
 import { trackEvent } from '../seo';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
-const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Sports', 'Entertainment', 'Business'];
+const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const countries: Array<'All' | PersonCountry> = ['All', 'Pakistan', 'India', 'USA', 'Global'];
 
 function sortPeople(people: Person[]) {
