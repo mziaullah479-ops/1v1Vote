@@ -2,6 +2,7 @@ export type Platform = 'YouTube' | 'TikTok' | 'Instagram' | 'Twitch';
 export type Region = 'Pakistan' | 'India' | 'USA' | 'Global';
 export type MatchRequestStatus = 'pending' | 'approved' | 'rejected';
 export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
+export type PromotionRequestStatus = 'pending' | 'approved' | 'rejected';
 export type PersonCategory = 'Public Figure' | 'Religious Scholar' | 'Politics' | 'Creator' | 'Sports' | 'Entertainment' | 'Business';
 export type PersonCountry = 'Pakistan' | 'India' | 'USA' | 'Global';
 export type PeopleAutomationState = 'idle' | 'running' | 'active' | 'source-refresh' | 'error';
@@ -52,6 +53,27 @@ export interface PersonPromotion {
   createdBy: string;
   createdAt: string;
   revokedAt?: string;
+}
+
+export interface PromotionRequest {
+  id: string;
+  personId: string;
+  personName: string;
+  requesterName: string;
+  requesterEmail: string;
+  createdAt: string;
+  status: PromotionRequestStatus;
+  paymentStatus: PaymentStatus;
+  paymentReference: string;
+  paymentAmountPkr: number;
+  durationHours: number;
+  startsAt: string;
+  endsAt: string;
+  label: string;
+  reason?: string;
+  adminNote?: string;
+  reviewedAt?: string;
+  promotionId?: string;
 }
 
 export interface Creator {
