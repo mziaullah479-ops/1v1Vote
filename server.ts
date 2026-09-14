@@ -105,7 +105,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
       ? titleOverrides[pathname]
       : staticTitles[pathname]
         ? `${staticTitles[pathname]} - 1v1Vote`
-        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Vote. Rank. Win.';
+        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Live Public Figure Rankings & Daily Voting';
   const description = person
     ? `Read about ${person.name}, view the source profile, and vote in the live 1v1Vote ranking.`
     : match
@@ -114,7 +114,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
       ? descriptionOverrides[pathname]
       : staticTitles[pathname]
         ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
-      : 'Vote once every 24 hours for important public figures, leaders, scholars, athletes, and entertainers.';
+      : 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once every 24 hours.';
   
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
