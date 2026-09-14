@@ -2,9 +2,9 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, UserProfile } from '../types';
+import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, PromotionRequest, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
-import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
+import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from '../data/matchPricing';
 import { scrapeSocialProfile } from './socialScraper';
 
 type Role = 'user' | 'admin';
@@ -72,6 +72,7 @@ interface DatabaseState {
   matches: Match[];
   people: Person[];
   promotions: PersonPromotion[];
+  promotionRequests: PromotionRequest[];
   comments: Record<string, Comment[]>;
   users: StoredUser[];
   sessions: StoredSession[];
@@ -173,7 +174,7 @@ function looksLikePersonPage(name: string, bio: string) {
   if (AUTO_PROFILE_BLOCKLIST.has(profileSlug(name))) return false;
   if (/relations?|war|conflict|history|election|treaty|attack|incident|movement|organization|company|collective|band|film|album|song|tournament|championship|season|district|province|country|university|government/i.test(name)) return false;
   if (/^(?:the )?(?:relations?|war|conflict|history|election|treaty|attack|incident)\b/i.test(bio)) return false;
-  return /\b(actor|actress|athlete|businessman|businesswoman|ceo|comedian|cricketer|creator|entrepreneur|footballer|imam|influencer|journalist|minister|politician|president|professor|rapper|scholar|singer|streamer|writer|youtuber|born|died)\b/i.test(bio);
+  return /\b(actor|actress|activist|artist|athlete|businessman|businessperson|businesswoman|ceo|comedian|coach|cricketer|creator|doctor|economist|entrepreneur|footballer|founder|imam|influencer|journalist|lawyer|minister|model|musician|politician|president|professor|rapper|scholar|singer|streamer|writer|youtuber|born|died)\b/i.test(bio);
 }
 
 async function discoverWithGemini(apiKey: string, existingNames: string[]) {
@@ -223,6 +224,30 @@ async function discoverFromWikipedia(existingNames: string[]) {
     { query: 'famous journalists and activists', country: 'Global', type: 'Public Figure' },
     { query: 'notable Nigerian politicians and business leaders', country: 'Global', type: 'Politics' },
     { query: 'notable Bangladeshi politicians and scholars', country: 'Global', type: 'Public Figure' },
+    { query: 'notable Nigerian actors and musicians', country: 'Global', type: 'Entertainment' },
+    { query: 'notable Bangladeshi actors and singers', country: 'Global', type: 'Entertainment' },
+    { query: 'notable Turkish actors and musicians', country: 'Global', type: 'Entertainment' },
+    { query: 'notable South Korean actors and singers', country: 'Global', type: 'Entertainment' },
+    { query: 'notable Japanese athletes and entertainers', country: 'Global', type: 'Sports' },
+    { query: 'notable Brazilian footballers', country: 'Global', type: 'Sports' },
+    { query: 'notable Argentine footballers', country: 'Global', type: 'Sports' },
+    { query: 'notable African athletes', country: 'Global', type: 'Sports' },
+    { query: 'notable European footballers', country: 'Global', type: 'Sports' },
+    { query: 'notable Arab scholars and public figures', country: 'Global', type: 'Religious Scholar' },
+    { query: 'notable Indonesian politicians and business leaders', country: 'Global', type: 'Politics' },
+    { query: 'notable Malaysian public figures', country: 'Global', type: 'Public Figure' },
+    { query: 'notable African business leaders', country: 'Global', type: 'Business' },
+    { query: 'famous women politicians', country: 'Global', type: 'Politics' },
+    { query: 'famous women scientists', country: 'Global', type: 'Public Figure' },
+    { query: 'famous women athletes', country: 'Global', type: 'Sports' },
+    { query: 'famous women actors and singers', country: 'Global', type: 'Entertainment' },
+    { query: 'famous technology founders', country: 'Global', type: 'Business' },
+    { query: 'famous philanthropists', country: 'Global', type: 'Business' },
+    { query: 'famous filmmakers and directors', country: 'Global', type: 'Entertainment' },
+    { query: 'famous comedians', country: 'Global', type: 'Entertainment' },
+    { query: 'famous photographers and artists', country: 'Global', type: 'Public Figure' },
+    { query: 'famous streamers and internet personalities', country: 'Global', type: 'Creator' },
+    { query: 'famous podcasters and vloggers', country: 'Global', type: 'Creator' },
   ] as const;
   const existing = new Set(existingNames.map((name) => name.toLowerCase()));
   const results: DiscoveryCandidate[] = [];
@@ -334,6 +359,7 @@ function emptyState(): DatabaseState {
     matches: clone(INITIAL_MATCHES),
     people: clone(INITIAL_PEOPLE),
     promotions: [],
+    promotionRequests: [],
     comments: clone(INITIAL_COMMENTS),
     users: [],
     sessions: [],
@@ -394,6 +420,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
       };
     }),
     promotions: Array.isArray(input.promotions) ? input.promotions : [],
+    promotionRequests: Array.isArray(input.promotionRequests) ? input.promotionRequests : [],
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
@@ -587,6 +614,73 @@ export class PersistentStore {
     await this.audit('person.promotion.revoked', actorId, { promotionId: promotion.id, personId: promotion.personId });
     await this.persist();
     return clone(promotion);
+  }
+
+  getPromotionRequests() {
+    return clone(this.state.promotionRequests.sort((left, right) => right.createdAt.localeCompare(left.createdAt)));
+  }
+
+  async createPromotionRequest(input: Record<string, unknown>) {
+    const personId = String(input.personId || '').trim();
+    const person = this.state.people.find((item) => item.id === personId && !item.archivedAt);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'Choose an active profile to promote.', 404);
+    const requesterName = String(input.requesterName || '').trim().slice(0, 80);
+    const requesterEmail = String(input.requesterEmail || '').trim().toLowerCase().slice(0, 160);
+    const paymentReference = String(input.paymentReference || '').trim().slice(0, 120);
+    const durationHours = Number(input.durationHours);
+    const plan = PROMOTION_PLANS.find((item) => item.durationHours === durationHours);
+    if (requesterName.length < 2) throw new StoreError('INVALID_REQUESTER', 'Please enter your name.');
+    if (!/^\S+@\S+\.\S+$/.test(requesterEmail)) throw new StoreError('INVALID_EMAIL', 'Please enter a valid email address.');
+    if (!plan) throw new StoreError('INVALID_PLAN', 'Please choose a valid promotion plan.');
+    if (paymentReference.length < 4) throw new StoreError('PAYMENT_REFERENCE_REQUIRED', 'Please enter the payment transaction reference.');
+    const startsAt = new Date();
+    const request: PromotionRequest = {
+      id: `promotion-request-${randomUUID()}`,
+      personId,
+      personName: person.name,
+      requesterName,
+      requesterEmail,
+      createdAt: nowIso(),
+      status: 'pending',
+      paymentStatus: 'submitted',
+      paymentReference,
+      paymentAmountPkr: plan.amountPkr,
+      durationHours: plan.durationHours,
+      startsAt: startsAt.toISOString(),
+      endsAt: new Date(startsAt.getTime() + plan.durationHours * 60 * 60 * 1000).toISOString(),
+      label: String(input.label || 'Sponsored profile').trim().slice(0, 80) || 'Sponsored profile',
+      reason: String(input.reason || '').trim().slice(0, 240) || undefined,
+    };
+    this.state.promotionRequests.unshift(request);
+    await this.audit('person.promotion.requested', undefined, { requestId: request.id, personId, amountPkr: request.paymentAmountPkr });
+    await this.persist();
+    return clone(request);
+  }
+
+  async reviewPromotionRequest(id: string, decision: 'approve' | 'reject', adminId: string, adminNote = '') {
+    const request = this.state.promotionRequests.find((item) => item.id === id);
+    if (!request) throw new StoreError('PROMOTION_REQUEST_NOT_FOUND', 'Promotion request not found.', 404);
+    if (request.status !== 'pending') throw new StoreError('REQUEST_ALREADY_REVIEWED', 'This promotion request has already been reviewed.', 409);
+    if (decision === 'reject') {
+      request.status = 'rejected';
+      request.paymentStatus = 'rejected';
+    } else {
+      const promotion = await this.createPromotion({
+        personId: request.personId,
+        label: request.label,
+        reason: request.reason || `Paid promotion requested by ${request.requesterEmail}.`,
+        startsAt: request.startsAt,
+        endsAt: request.endsAt,
+      }, adminId);
+      request.status = 'approved';
+      request.paymentStatus = 'verified';
+      request.promotionId = promotion.id;
+    }
+    request.adminNote = adminNote.trim().slice(0, 600) || undefined;
+    request.reviewedAt = nowIso();
+    await this.audit(`person.promotion.request.${decision}d`, adminId, { requestId: request.id, promotionId: request.promotionId });
+    await this.persist();
+    return clone(request);
   }
 
   private personInput(input: Partial<Person>, existing?: Person): Person {
