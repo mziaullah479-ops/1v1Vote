@@ -254,23 +254,27 @@ async function discoverFromWikipedia(existingNames: string[]) {
   const existing = new Set(existingNames.map((name) => name.toLowerCase()));
   const results: DiscoveryCandidate[] = [];
   await Promise.all(sources.map(async (source) => {
-    const params = new URLSearchParams({
-      action: 'query', format: 'json', origin: '*', generator: 'search',
-       gsrsearch: source.query, gsrlimit: '20', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
-      exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
-    });
-    const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
-    if (!response.ok) return;
-    const payload = await response.json() as { query?: { pages?: Record<string, { title?: string; extract?: string; fullurl?: string; original?: { source?: string }; thumbnail?: { source?: string }; pageviews?: Record<string, number> }> } };
-    for (const page of Object.values(payload.query?.pages || {})) {
-      const name = page.title?.trim() || '';
-      const profileUrl = page.fullurl || '';
-      const bio = page.extract?.replace(/\s+/g, ' ').trim() || '';
-      const imageUrl = page.original?.source || page.thumbnail?.source || '';
-      const slug = profileSlug(name);
-       if (name.length < 2 || /^list of|people from|politics of/i.test(name) || !looksLikePersonPage(name, bio) || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
-      results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl, popularity: Object.values(page.pageviews || {}).reduce((sum, value) => sum + (value || 0), 0) });
-      existing.add(name.toLowerCase());
+    try {
+      const params = new URLSearchParams({
+        action: 'query', format: 'json', origin: '*', generator: 'search',
+         gsrsearch: source.query, gsrlimit: '20', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
+        exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
+      });
+      const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
+      if (!response.ok) return;
+      const payload = await response.json() as { query?: { pages?: Record<string, { title?: string; extract?: string; fullurl?: string; original?: { source?: string }; thumbnail?: { source?: string }; pageviews?: Record<string, number> }> } };
+      for (const page of Object.values(payload.query?.pages || {})) {
+        const name = page.title?.trim() || '';
+        const profileUrl = page.fullurl || '';
+        const bio = page.extract?.replace(/\s+/g, ' ').trim() || '';
+        const imageUrl = page.original?.source || page.thumbnail?.source || '';
+        const slug = profileSlug(name);
+        if (name.length < 2 || /^list of|people from|politics of/i.test(name) || !looksLikePersonPage(name, bio) || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
+        results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl, popularity: Object.values(page.pageviews || {}).reduce((sum, value) => sum + (value || 0), 0) });
+        existing.add(name.toLowerCase());
+      }
+    } catch {
+      return;
     }
   }));
   return results.sort((left, right) => (right.popularity || 0) - (left.popularity || 0)).slice(0, 300);
