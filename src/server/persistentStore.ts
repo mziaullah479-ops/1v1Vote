@@ -100,6 +100,7 @@ interface DiscoveryCandidate {
 
 const DATABASE_VERSION = 4;
 const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
+const PEOPLE_REFRESH_LIMIT = 25;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971', 'albania', 'american-samoa', 'toronto',
@@ -808,7 +809,11 @@ export class PersistentStore {
 
   async refreshPeopleProfiles() {
     let refreshed = 0;
-    for (const person of this.state.people) {
+    const peopleToRefresh = this.state.people
+      .filter((person) => person.researchUrl || person.profileUrl)
+      .sort((left, right) => (left.lastResearchedAt || '').localeCompare(right.lastResearchedAt || ''))
+      .slice(0, PEOPLE_REFRESH_LIMIT);
+    for (const person of peopleToRefresh) {
       const researchUrl = person.researchUrl || person.profileUrl;
       if (!researchUrl) continue;
       try {
