@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronUp, Clock3, ExternalLink, Globe2, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote, Workflow } from 'lucide-react';
+import { Check, ChevronUp, Clock3, ExternalLink, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
-import { Person, PersonCategory, PersonCountry, PeopleAutomationStatus } from '../types';
+import { Person, PersonCategory, PersonCountry } from '../types';
+import { SiteFooter } from './SiteFooter';
+import { trackEvent } from '../seo';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
 const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Sports', 'Entertainment', 'Business'];
@@ -84,6 +86,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
       </div>
 
       <p className="relative mt-4 min-h-10 line-clamp-3 text-xs leading-relaxed text-slate-400">{person.bio || person.shortBio}</p>
+      {person.promotion && <div className="relative mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-200"><Sparkles className="h-3 w-3" /> {person.promotion.label}</div>}
 
       <div className="relative mt-4 flex items-end justify-between border-t border-slate-800/80 pt-3">
         <div>
@@ -120,7 +123,6 @@ export const PeopleDashboard: React.FC = () => {
   const [cooldowns, setCooldowns] = useState<Record<string, string>>(() => readCooldowns());
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [automation, setAutomation] = useState<PeopleAutomationStatus | null>(null);
 
   const loadPeople = async () => {
     try {
@@ -136,21 +138,10 @@ export const PeopleDashboard: React.FC = () => {
     }
   };
 
-  const loadAutomationStatus = async () => {
-    try {
-      const response = await fetch('/api/automation/status', { cache: 'no-store' });
-      if (response.ok) setAutomation(await response.json() as PeopleAutomationStatus);
-    } catch {
-      // The profile feed remains usable if the status endpoint is unavailable.
-    }
-  };
-
   useEffect(() => {
     void loadPeople();
-    void loadAutomationStatus();
     const interval = window.setInterval(() => {
       void loadPeople();
-      void loadAutomationStatus();
     }, 15000);
     return () => window.clearInterval(interval);
   }, []);
@@ -189,6 +180,7 @@ export const PeopleDashboard: React.FC = () => {
         setCooldowns(next);
         saveCooldowns(next);
         setPeople((current) => sortPeople(current.map((item) => item.id === payload.person!.id ? payload.person! : item)));
+        trackEvent('vote_submitted', { profile_category: person.category, profile_country: person.country });
       }
       showToast(`Vote registered for ${person.name}. You can vote for this profile again in 24 hours.`);
     } catch {
@@ -201,9 +193,11 @@ export const PeopleDashboard: React.FC = () => {
     void fetch(`/api/people/${encodeURIComponent(person.id)}/share`, { method: 'POST' }).catch(() => undefined);
     try {
       if (navigator.share) {
+        trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
         await navigator.share({ title: `${person.name} on 1v1Vote`, text: `Vote for ${person.name} on 1v1Vote.`, url: shareUrl });
       } else {
         await navigator.clipboard.writeText(shareUrl);
+        trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
         showToast('Profile link copied.');
       }
     } catch {
@@ -216,7 +210,7 @@ export const PeopleDashboard: React.FC = () => {
     const rankQuery = query.match(/(?:rank|number|#)?\s*(\d+)/)?.[1];
     const rank = people.findIndex((item) => item.id === person.id) + 1;
     const matchesRank = Boolean(rankQuery && Number(rankQuery) === rank);
-    const matchesSearch = !query || matchesRank || `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query);
+    const matchesSearch = !query || (rankQuery ? matchesRank : `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query));
     return matchesSearch && (category === 'All' || person.category === category) && (country === 'All' || person.country === country);
   });
   const totalVotes = people.reduce((sum, person) => sum + person.votes, 0);
@@ -240,30 +234,27 @@ export const PeopleDashboard: React.FC = () => {
           <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
           <div className="relative max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> One person, one vote every 24 hours</div>
-            <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">Public opinion, ranked live</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">Vote for any public figure you support. No login, no profile, no competition brackets. Every profile has one vote per device every 24 hours, and the most-voted people rise to the top.</p>
+            <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">The public pulse, ranked live.</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">Discover notable people, read their source-backed profiles, and cast one vote every 24 hours. The ranking stays simple: real people, live support, clear sources.</p>
           </div>
           <div className="relative mt-7 grid grid-cols-3 gap-2 border-t border-slate-800/80 pt-5 sm:max-w-xl sm:gap-8">
             <div><div className="text-xl font-black text-white">{formatCount(people.length)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Profiles</div></div>
             <div><div className="text-xl font-black text-white">{formatCount(totalVotes)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Total votes</div></div>
             <div><div className="text-xl font-black text-emerald-300">24h</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Vote reset</div></div>
           </div>
-          <div className="relative mt-6 flex max-w-2xl items-center gap-3 rounded-2xl border border-slate-700/70 bg-black/15 px-3 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-400/30 bg-sky-400/10 text-sky-300"><Workflow className="h-4 w-4" /></div>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-xs font-black text-white"><Globe2 className="h-3.5 w-3.5 text-emerald-300" /> Auto profile workflow</div><div className="mt-1 text-[10px] text-slate-500">{automation?.enabled ? 'Browser research, source verification, and AI discovery are active.' : 'Browser research, source verification, and public-source discovery are active.'}</div></div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${automation?.state === 'error' ? 'bg-red-400/15 text-red-300' : automation?.state === 'running' ? 'bg-amber-400/15 text-amber-200' : 'bg-emerald-400/15 text-emerald-300'}`}>{automation?.state === 'running' ? 'Running' : automation?.state === 'error' ? 'Needs attention' : 'Active'}</span>
-          </div>
         </section>
+
+        {people.length > 0 && <section className="mt-5 overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-r from-[#151125] via-[#0b1221] to-[#101b2b] p-4 shadow-xl sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300"><Sparkles className="h-3.5 w-3.5" /> Live signal</div><h2 className="mt-1 text-lg font-black text-white">Who leads the public pulse today?</h2></div><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Organic votes</span></div><div className="mt-4 grid gap-3 md:grid-cols-3">{people.slice(0, 3).map((person, index) => <a key={person.id} href={`/people/${encodeURIComponent(person.slug)}`} className={`group flex items-center gap-3 rounded-2xl border p-3 transition hover:-translate-y-0.5 ${index === 0 ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-[#080e1b]/70'}`}><span className="text-lg font-black text-amber-300">0{index + 1}</span><img src={person.avatar} alt="" width={42} height={42} loading="lazy" className="h-10 w-10 rounded-xl object-cover" /><span className="min-w-0"><span className="block truncate text-sm font-black text-white group-hover:text-sky-300">{person.name}</span><span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatCount(person.votes)} votes · {person.country}</span></span></a>)}</div></section>}
 
         <section className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div><h2 className="text-2xl font-black text-white">Most voted people</h2><p className="mt-1 text-xs text-slate-500">One dashboard for notable people from Pakistan and around the world</p></div>
-          <div className="relative w-full lg:max-w-xs"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a profile" className="min-h-11 w-full rounded-xl border border-slate-800 bg-[#0b1221] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-500/70" /></div>
+          <div className="relative w-full lg:max-w-xs"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search person, country or rank" className="min-h-11 w-full rounded-xl border border-slate-800 bg-[#0b1221] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-500/70" /></div>
         </section>
 
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+        <div className="mt-5 flex items-center gap-3 overflow-x-auto pb-1 [scrollbar-width:none]"><span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-slate-600">Regions</span>
           {countries.map((item) => <button key={item} type="button" onClick={() => setCountry(item)} className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold transition ${country === item ? 'border-sky-400 bg-sky-400/15 text-sky-200' : 'border-slate-800 bg-[#0b1221] text-slate-500 hover:text-slate-300'}`}>{item === 'All' ? 'All regions' : item}</button>)}
         </div>
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+        <div className="mt-2 flex items-center gap-3 overflow-x-auto pb-1 [scrollbar-width:none]"><span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-slate-600">Categories</span>
           {categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold transition ${category === item ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-slate-800 bg-[#0b1221] text-slate-500 hover:text-slate-300'}`}>{item}</button>)}
         </div>
 
@@ -273,6 +264,7 @@ export const PeopleDashboard: React.FC = () => {
 
         <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/80 bg-[#0b1221]/70 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-sky-400" /> No account required. Vote once for each profile every 24 hours.</div><div className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Share any profile with its link.</div></div>
       </main>
+      <SiteFooter />
     </div>
   );
 };
