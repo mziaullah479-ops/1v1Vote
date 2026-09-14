@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, UserProfile } from '../types';
+import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
 import { scrapeSocialProfile } from './socialScraper';
@@ -71,6 +71,7 @@ interface DatabaseState {
   version: number;
   matches: Match[];
   people: Person[];
+  promotions: PersonPromotion[];
   comments: Record<string, Comment[]>;
   users: StoredUser[];
   sessions: StoredSession[];
@@ -97,6 +98,7 @@ interface DiscoveryCandidate {
 }
 
 const DATABASE_VERSION = 4;
+const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971',
@@ -198,17 +200,37 @@ async function discoverFromWikipedia(existingNames: string[]) {
   const sources = [
     { query: 'notable Pakistani politicians', country: 'Pakistan', type: 'Politics' },
     { query: 'notable Pakistani Islamic scholars', country: 'Pakistan', type: 'Religious Scholar' },
-     { query: 'notable Pakistani athletes and business leaders', country: 'Pakistan', type: 'Sports' },
+    { query: 'notable Pakistani athletes', country: 'Pakistan', type: 'Sports' },
+    { query: 'notable Pakistani business leaders', country: 'Pakistan', type: 'Business' },
+    { query: 'notable Pakistani actors and singers', country: 'Pakistan', type: 'Entertainment' },
+    { query: 'notable Pakistani journalists and writers', country: 'Pakistan', type: 'Public Figure' },
+    { query: 'notable Indian politicians', country: 'India', type: 'Politics' },
+    { query: 'notable Indian religious scholars', country: 'India', type: 'Religious Scholar' },
     { query: 'notable Indian actors', country: 'India', type: 'Entertainment' },
     { query: 'notable Indian cricketers', country: 'India', type: 'Sports' },
-    { query: 'notable American YouTubers', country: 'USA', type: 'Creator' },
+    { query: 'notable Indian business leaders', country: 'India', type: 'Business' },
+    { query: 'notable American politicians', country: 'USA', type: 'Politics' },
+    { query: 'notable American athletes', country: 'USA', type: 'Sports' },
+    { query: 'notable American business leaders', country: 'USA', type: 'Business' },
+    { query: 'notable American actors and singers', country: 'USA', type: 'Entertainment' },
+    { query: 'notable American YouTubers and streamers', country: 'USA', type: 'Creator' },
+    { query: 'famous world politicians', country: 'Global', type: 'Politics' },
+    { query: 'famous world religious leaders and scholars', country: 'Global', type: 'Religious Scholar' },
+    { query: 'famous footballers and athletes', country: 'Global', type: 'Sports' },
+    { query: 'famous international actors', country: 'Global', type: 'Entertainment' },
+    { query: 'famous international singers and musicians', country: 'Global', type: 'Entertainment' },
+    { query: 'famous scientists and inventors', country: 'Global', type: 'Public Figure' },
+    { query: 'famous writers and authors', country: 'Global', type: 'Public Figure' },
+    { query: 'famous journalists and activists', country: 'Global', type: 'Public Figure' },
+    { query: 'notable Nigerian politicians and business leaders', country: 'Global', type: 'Politics' },
+    { query: 'notable Bangladeshi politicians and scholars', country: 'Global', type: 'Public Figure' },
   ] as const;
   const existing = new Set(existingNames.map((name) => name.toLowerCase()));
   const results: DiscoveryCandidate[] = [];
   await Promise.all(sources.map(async (source) => {
     const params = new URLSearchParams({
       action: 'query', format: 'json', origin: '*', generator: 'search',
-      gsrsearch: source.query, gsrlimit: '12', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
+       gsrsearch: source.query, gsrlimit: '20', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
       exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
     });
     const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
@@ -225,7 +247,7 @@ async function discoverFromWikipedia(existingNames: string[]) {
       existing.add(name.toLowerCase());
     }
   }));
-  return results.sort((left, right) => (right.popularity || 0) - (left.popularity || 0)).slice(0, 12);
+  return results.sort((left, right) => (right.popularity || 0) - (left.popularity || 0)).slice(0, 300);
 }
 
 function tokenHash(token: string) {
@@ -312,6 +334,7 @@ function emptyState(): DatabaseState {
     version: DATABASE_VERSION,
     matches: clone(INITIAL_MATCHES),
     people: clone(INITIAL_PEOPLE),
+    promotions: [],
     comments: clone(INITIAL_COMMENTS),
     users: [],
     sessions: [],
@@ -323,12 +346,13 @@ function emptyState(): DatabaseState {
     audit: [],
     matchRequests: [],
     peopleAutomation: {
-      enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      enabled: true,
       state: process.env.GEMINI_API_KEY?.trim() ? 'idle' : 'source-refresh',
       provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
       lastRefreshed: 0,
       lastPublished: 0,
-      discoveryVersion: 3,
+      discoveryVersion: 4,
+      paused: false,
     },
   };
 }
@@ -370,6 +394,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
         updatedAt: person.updatedAt || nowIso(),
       };
     }),
+    promotions: Array.isArray(input.promotions) ? input.promotions : [],
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
@@ -382,9 +407,10 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     matchRequests: Array.isArray(input.matchRequests) ? input.matchRequests : [],
     peopleAutomation: {
       ...seeded.peopleAutomation,
-      ...(input.peopleAutomation || {}),
-      enabled: Boolean(process.env.GEMINI_API_KEY?.trim()),
-      provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
+       ...(input.peopleAutomation || {}),
+       enabled: !(input.peopleAutomation?.paused ?? false),
+       paused: Boolean(input.peopleAutomation?.paused),
+       provider: process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources',
     },
   };
 }
@@ -504,7 +530,7 @@ export class PersistentStore {
   }
 
   getPeopleSnapshot() {
-    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar))).sort((left, right) => {
+    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map((person) => ({ ...person, promotion: this.activePromotionFor(person.id) }))).sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;
       if (right.shares !== left.shares) return right.shares - left.shares;
       return left.name.localeCompare(right.name);
@@ -512,11 +538,12 @@ export class PersistentStore {
   }
 
   getPerson(idOrSlug: string) {
-    return this.state.people.find((person) => !person.archivedAt && (person.id === idOrSlug || person.slug === idOrSlug));
+    const person = this.state.people.find((item) => !item.archivedAt && (item.id === idOrSlug || item.slug === idOrSlug));
+    return person ? { ...person, promotion: this.activePromotionFor(person.id) } : undefined;
   }
 
   getAdminPeopleSnapshot() {
-    return clone(this.state.people).sort((left, right) => {
+    return clone(this.state.people.map((person) => ({ ...person, promotion: this.activePromotionFor(person.id) }))).sort((left, right) => {
       if (Boolean(left.archivedAt) !== Boolean(right.archivedAt)) return left.archivedAt ? 1 : -1;
       return left.name.localeCompare(right.name);
     });
@@ -524,6 +551,43 @@ export class PersistentStore {
 
   getAutomationStatus() {
     return clone(this.state.peopleAutomation);
+  }
+
+  private activePromotionFor(personId: string) {
+    const now = Date.now();
+    return this.state.promotions.find((promotion) => promotion.personId === personId && !promotion.revokedAt && new Date(promotion.startsAt).getTime() <= now && new Date(promotion.endsAt).getTime() > now);
+  }
+
+  getPromotions(includeRevoked = true) {
+    return clone(this.state.promotions.filter((promotion) => includeRevoked || !promotion.revokedAt).sort((left, right) => right.createdAt.localeCompare(left.createdAt)));
+  }
+
+  async createPromotion(input: Record<string, unknown>, actorId = 'admin') {
+    const personId = String(input.personId || '').trim();
+    const person = this.state.people.find((item) => item.id === personId && !item.archivedAt);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'Choose an active profile to promote.', 404);
+    const label = String(input.label || 'Featured profile').trim().slice(0, 80);
+    const reason = String(input.reason || '').trim().slice(0, 240) || undefined;
+    const startsAt = new Date(String(input.startsAt || Date.now()));
+    const endsAt = new Date(String(input.endsAt || Date.now() + 24 * 60 * 60 * 1000));
+    if (label.length < 2 || !Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt.getTime() <= startsAt.getTime()) throw new StoreError('INVALID_PROMOTION', 'Promotion dates and label are required.');
+    if (endsAt.getTime() - startsAt.getTime() > 30 * 24 * 60 * 60 * 1000) throw new StoreError('PROMOTION_TOO_LONG', 'A promotion can run for up to 30 days.');
+    if (this.state.promotions.filter((promotion) => !promotion.revokedAt && new Date(promotion.endsAt).getTime() > Date.now()).length >= 3) throw new StoreError('PROMOTION_LIMIT', 'Only three active promotions are allowed at once.', 409);
+    if (this.state.promotions.some((promotion) => promotion.personId === personId && !promotion.revokedAt && new Date(promotion.endsAt).getTime() > startsAt.getTime() && new Date(promotion.startsAt).getTime() < endsAt.getTime())) throw new StoreError('PROMOTION_EXISTS', 'This profile already has an overlapping promotion.', 409);
+    const promotion: PersonPromotion = { id: `promotion-${randomUUID()}`, personId, label, reason, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), createdBy: actorId, createdAt: nowIso() };
+    this.state.promotions.push(promotion);
+    await this.audit('person.promotion.created', actorId, { promotionId: promotion.id, personId, endsAt: promotion.endsAt });
+    await this.persist();
+    return clone(promotion);
+  }
+
+  async revokePromotion(id: string, actorId = 'admin') {
+    const promotion = this.state.promotions.find((item) => item.id === id && !item.revokedAt);
+    if (!promotion) throw new StoreError('PROMOTION_NOT_FOUND', 'Promotion not found.', 404);
+    promotion.revokedAt = nowIso();
+    await this.audit('person.promotion.revoked', actorId, { promotionId: promotion.id, personId: promotion.personId });
+    await this.persist();
+    return clone(promotion);
   }
 
   private personInput(input: Partial<Person>, existing?: Person): Person {
@@ -671,7 +735,7 @@ export class PersistentStore {
     return refreshed;
   }
 
-  private async discoverPeople() {
+  private async discoverPeople(limit = 1) {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     const existingNames = this.state.people.map((person) => person.name);
     const candidates = apiKey
@@ -683,10 +747,10 @@ export class PersistentStore {
     const socialHosts = /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitch\.tv/i;
     let published = 0;
 
-    for (const candidate of candidates.slice(0, 5)) {
+    for (const candidate of candidates.slice(0, limit)) {
       const candidateName = String(candidate.name || '').trim().slice(0, 80);
       const profileUrl = String(candidate.profileUrl || '').trim();
-      if (candidateName.length < 2 || !profileUrl || candidate.category === 'Creator' || existingKeys.has(candidateName.toLowerCase())) continue;
+      if (candidateName.length < 2 || !profileUrl || existingKeys.has(candidateName.toLowerCase())) continue;
       let parsedUrl: URL;
       try {
         parsedUrl = new URL(profileUrl);
@@ -743,7 +807,8 @@ export class PersistentStore {
   async runPeopleAutomation(force = false) {
     const current = this.state.peopleAutomation;
     if (this.peopleAutomationBusy) return this.getAutomationStatus();
-    if (!force && current.discoveryVersion === 3 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < 23 * 60 * 60 * 1000) {
+    if (!force && current.paused) return this.getAutomationStatus();
+    if (!force && current.discoveryVersion === 4 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < PEOPLE_AUTOMATION_INTERVAL_MS) {
       return this.getAutomationStatus();
     }
     this.peopleAutomationBusy = true;
@@ -751,15 +816,15 @@ export class PersistentStore {
     current.lastError = undefined;
     try {
       const refreshed = await this.refreshPeopleProfiles();
-      const published = await this.discoverPeople();
-      current.enabled = Boolean(process.env.GEMINI_API_KEY?.trim());
-      current.provider = current.enabled ? 'Google Search + Gemini' : 'Wikipedia public sources';
-      current.state = 'active';
+      const published = await this.discoverPeople(1);
+      current.enabled = !current.paused;
+      current.provider = process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources';
+      current.state = current.paused ? 'idle' : 'active';
       current.lastRunAt = nowIso();
       current.lastRefreshed = refreshed;
       current.lastPublished = published;
-      current.discoveryVersion = 3;
-      current.nextRunAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      current.discoveryVersion = 4;
+      current.nextRunAt = current.paused ? undefined : new Date(Date.now() + PEOPLE_AUTOMATION_INTERVAL_MS).toISOString();
     } catch (error) {
       current.state = 'error';
       current.lastRunAt = nowIso();
@@ -770,6 +835,52 @@ export class PersistentStore {
       this.peopleAutomationBusy = false;
       await this.persist();
     }
+    return this.getAutomationStatus();
+  }
+
+  async startPeopleCatalogImport(limit = 200) {
+    const current = this.state.peopleAutomation;
+    if (this.peopleAutomationBusy) return this.getAutomationStatus();
+
+    this.peopleAutomationBusy = true;
+    current.state = 'running';
+    current.lastError = undefined;
+
+    void (async () => {
+      try {
+        await this.persist();
+        const refreshed = await this.refreshPeopleProfiles();
+        const published = await this.discoverPeople(Math.max(1, Math.min(limit, 200)));
+        current.enabled = !current.paused;
+        current.provider = process.env.GEMINI_API_KEY?.trim() ? 'Google Search + Gemini' : 'Wikipedia public sources';
+        current.state = current.paused ? 'idle' : 'active';
+        current.lastRunAt = nowIso();
+        current.lastRefreshed = refreshed;
+        current.lastPublished = published;
+        current.discoveryVersion = 5;
+        current.nextRunAt = current.paused ? undefined : new Date(Date.now() + PEOPLE_AUTOMATION_INTERVAL_MS).toISOString();
+      } catch (error) {
+        current.state = 'error';
+        current.lastRunAt = nowIso();
+        current.lastRefreshed = 0;
+        current.lastPublished = 0;
+        current.lastError = error instanceof Error ? error.message : 'The catalog import failed.';
+      } finally {
+        this.peopleAutomationBusy = false;
+        await this.persist();
+      }
+    })();
+
+    return this.getAutomationStatus();
+  }
+
+  async setPeopleAutomationPaused(paused: boolean, actorId = 'admin') {
+    this.state.peopleAutomation.paused = paused;
+    this.state.peopleAutomation.enabled = !paused;
+    this.state.peopleAutomation.state = paused ? 'idle' : 'active';
+    this.state.peopleAutomation.nextRunAt = paused ? undefined : new Date(Date.now() + PEOPLE_AUTOMATION_INTERVAL_MS).toISOString();
+    await this.audit(paused ? 'people.automation.paused' : 'people.automation.resumed', actorId);
+    await this.persist();
     return this.getAutomationStatus();
   }
 
