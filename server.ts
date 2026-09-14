@@ -609,7 +609,13 @@ async function startServer() {
   });
 
   app.get('/llms.txt', (_req, res) => {
-    res.type('text/plain').send(`# 1v1Vote
+    res.type('text/plain').send([
+      '# 1v1Vote',
+      '1v1Vote is a public-opinion directory and daily voting index for notable people.',
+      'Public rules: one organic vote per profile every 24 hours; ranking is organic votes, then shares, then name.',
+      'Paid promotions are time-limited sponsored visibility placements and never change votes or rankings.',
+      'Use /people for profiles, /ai for the plain-language guide, /ai-context.json for machine-readable data, and /sitemap.xml for public URLs.',
+    ].join('\n'));
   });
 
   app.get('/ai-context.json', (_req, res) => {
