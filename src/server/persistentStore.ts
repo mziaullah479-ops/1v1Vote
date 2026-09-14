@@ -103,7 +103,7 @@ const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971', 'albania', 'american-samoa', 'toronto',
-  'pakistan-tehreek-e-insaf', 'playback-singer', 'hinduism', 'pakistan-air-force',
+  'pakistan-tehreek-e-insaf', 'playback-singer', 'hinduism', 'pakistan-air-force', 'bachchan-family',
 ]);
 const PERSON_CATEGORIES: PersonCategory[] = ['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const PERSON_COUNTRIES: PersonCountry[] = ['Pakistan', 'India', 'USA', 'Global'];
