@@ -115,7 +115,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
       : staticTitles[pathname]
         ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
       : 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once every 24 hours.';
-  
+
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
   result = replaceMeta(result, 'property', 'og:title', title);
@@ -175,6 +175,7 @@ async function startServer() {
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
   app.set('trust proxy', 1);
+
   const isTrustedMutation = (req: express.Request) => {
     const origin = req.get('origin');
     if (origin) return origin === siteOrigin() || allowedOrigins.has(origin);
@@ -218,11 +219,6 @@ async function startServer() {
   app.get('/api/people', (_req, res) => {
     res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
   });
-
-  app.get('/api/automation/status', (_req, res) => {
-    return res.status(404).json({ error: 'Not found.' });
-  });
-
 
   app.get('/api/people/:personId', (req, res) => {
     const person = store.getPerson(req.params.personId);
@@ -405,6 +401,29 @@ async function startServer() {
     return res.json({ automation: store.getAutomationStatus() });
   });
 
+  app.get('/api/admin/promotions', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ promotions: store.getPromotions() });
+  });
+
+  app.post('/api/admin/promotions', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.status(201).json({ promotion: await store.createPromotion(req.body || {}) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.delete('/api/admin/promotions/:promotionId', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json({ promotion: await store.revokePromotion(req.params.promotionId) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.post('/api/admin/people', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -502,6 +521,15 @@ async function startServer() {
     if (!requireAdmin(req, res)) return;
     try {
       return res.json({ automation: await store.runPeopleAutomation(true), people: store.getPeopleSnapshot() });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/admin/people/catalog', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.status(202).json({ automation: await store.startPeopleCatalogImport(200) });
     } catch (error) {
       return errorResponse(res, error);
     }
