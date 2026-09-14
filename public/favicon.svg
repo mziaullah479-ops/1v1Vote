@@ -9,8 +9,9 @@
       <stop offset="1" stop-color="#fb923c"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="#070a13"/>
+  <rect width="64" height="64" rx="16" fill="#050816"/>
   <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)"/>
-  <text x="32" y="41" fill="white" font-family="Arial, sans-serif" font-size="22" font-weight="900" font-style="italic" text-anchor="middle">1v1</text>
-  <path d="M20 48h24" stroke="url(#vs)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M13 17h38" stroke="#bae6fd" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+  <text x="32" y="41" fill="white" font-family="Arial, sans-serif" font-size="21" font-weight="900" font-style="italic" text-anchor="middle">1V1</text>
+  <path d="M17 49h30" stroke="url(#vs)" stroke-width="4" stroke-linecap="round"/>
 </svg>
