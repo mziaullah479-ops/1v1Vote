@@ -103,7 +103,7 @@ const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971', 'albania', 'american-samoa', 'toronto',
-  'pakistan-tehreek-e-insaf', 'playback-singer',
+  'pakistan-tehreek-e-insaf', 'playback-singer', 'hinduism', 'pakistan-air-force',
 ]);
 const PERSON_CATEGORIES: PersonCategory[] = ['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const PERSON_COUNTRIES: PersonCountry[] = ['Pakistan', 'India', 'USA', 'Global'];
@@ -269,7 +269,7 @@ async function discoverFromWikipedia(existingNames: string[]) {
         const bio = page.extract?.replace(/\s+/g, ' ').trim() || '';
         const imageUrl = page.original?.source || page.thumbnail?.source || '';
         const slug = profileSlug(name);
-        if (name.length < 2 || /^list of|people from|politics of/i.test(name) || !looksLikePersonPage(name, bio) || !bio || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
+        if (name.length < 2 || /^list of|people from|politics of/i.test(name) || !profileUrl || !imageUrl || existing.has(name.toLowerCase())) continue;
         results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl, popularity: Object.values(page.pageviews || {}).reduce((sum, value) => sum + (value || 0), 0) });
         existing.add(name.toLowerCase());
       }
@@ -865,6 +865,8 @@ export class PersistentStore {
         const image = candidate.imageUrl || (('avatarUrl' in researched ? researched.avatarUrl : researched.avatar) || '');
         if (!(await isUsableImage(image))) continue;
         const name = socialHosts.test(profileUrl) ? (('name' in researched && researched.name) || candidateName) : candidateName;
+        const researchedBio = String(candidate.bio || candidate.shortBio || ('shortBio' in researched ? researched.shortBio : '') || '').trim();
+        if (!looksLikePersonPage(name, researchedBio)) continue;
         const slug = profileSlug(name);
         if (!slug || existingKeys.has(slug) || existingKeys.has(name.toLowerCase())) continue;
         const category = categories.has(String(candidate.category)) ? String(candidate.category) as Person['category'] : 'Public Figure';
@@ -875,7 +877,7 @@ export class PersistentStore {
           slug,
           name,
           shortBio: String(candidate.shortBio || ('shortBio' in researched ? researched.shortBio : '') || 'A notable public figure researched from a reliable public source.').slice(0, 220),
-          bio: String(candidate.bio || candidate.shortBio || ('shortBio' in researched ? researched.shortBio : '') || '').slice(0, 700),
+          bio: researchedBio.slice(0, 700),
           category,
           country,
           avatar: image,
