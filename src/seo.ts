@@ -8,6 +8,14 @@ export function setMeta(attribute: 'name' | 'property', key: string, content: st
   element.content = content;
 }
 
+export function trackEvent(name: string, params: Record<string, string | number | boolean> = {}) {
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', name, params);
+  } else if (Array.isArray(window.dataLayer)) {
+    window.dataLayer.push({ event: name, ...params });
+  }
+}
+
 export function setPageSeo(title: string, description: string, path: string, image?: string) {
   const url = `${window.location.origin}${path}`;
   document.title = title;
@@ -23,5 +31,10 @@ export function setPageSeo(title: string, description: string, path: string, ima
   }
   const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
   if (canonical) canonical.href = url;
-  if (typeof window.gtag === 'function') window.gtag('event', 'page_view', { page_title: title, page_location: url, page_path: path });
+  const analyticsWindow = window as Window & { __lastPageViewKey?: string };
+  const pageViewKey = `${path}|${title}`;
+  if (analyticsWindow.__lastPageViewKey !== pageViewKey) {
+    analyticsWindow.__lastPageViewKey = pageViewKey;
+    trackEvent('page_view', { page_title: title, page_location: url, page_path: path });
+  }
 }

@@ -49,7 +49,9 @@ if (measurementId) {
   });
 }
 
-if (gtmId) {
+// GA4 owns analytics when a measurement ID is configured. This avoids duplicate
+// pageviews when a GTM container also contains a GA tag.
+if (gtmId && !measurementId) {
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
   deferThirdPartyWork(() => {

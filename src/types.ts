@@ -39,6 +39,19 @@ export interface Person {
   updatedAt: string;
   lastResearchedAt?: string;
   archivedAt?: string;
+  promotion?: PersonPromotion;
+}
+
+export interface PersonPromotion {
+  id: string;
+  personId: string;
+  label: string;
+  reason?: string;
+  startsAt: string;
+  endsAt: string;
+  createdBy: string;
+  createdAt: string;
+  revokedAt?: string;
 }
 
 export interface Creator {
