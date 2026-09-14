@@ -257,7 +257,7 @@ async function discoverFromWikipedia(existingNames: string[]) {
     try {
       const params = new URLSearchParams({
         action: 'query', format: 'json', origin: '*', generator: 'search',
-         gsrsearch: source.query, gsrlimit: '100', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
+         gsrsearch: source.query, gsrlimit: '20', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
         exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
       });
       const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
@@ -277,7 +277,7 @@ async function discoverFromWikipedia(existingNames: string[]) {
       return;
     }
   }));
-  return results.sort((left, right) => (right.popularity || 0) - (left.popularity || 0)).slice(0, 1000);
+  return results.sort((left, right) => (right.popularity || 0) - (left.popularity || 0)).slice(0, 300);
 }
 
 function tokenHash(token: string) {
