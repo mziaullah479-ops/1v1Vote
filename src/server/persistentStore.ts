@@ -102,7 +102,8 @@ const DATABASE_VERSION = 4;
 const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
-  'india-pakistan-relations', 'india-pakistan-war-of-1971',
+  'india-pakistan-relations', 'india-pakistan-war-of-1971', 'albania', 'american-samoa', 'toronto',
+  'pakistan-tehreek-e-insaf', 'playback-singer',
 ]);
 const PERSON_CATEGORIES: PersonCategory[] = ['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const PERSON_COUNTRIES: PersonCountry[] = ['Pakistan', 'India', 'USA', 'Global'];
@@ -172,7 +173,8 @@ function shouldArchivePerson(person: Person) {
 
 function looksLikePersonPage(name: string, bio: string) {
   if (AUTO_PROFILE_BLOCKLIST.has(profileSlug(name))) return false;
-  if (/relations?|war|conflict|history|election|treaty|attack|incident|movement|organization|company|collective|band|film|album|song|tournament|championship|season|district|province|country|university|government/i.test(name)) return false;
+  if (/relations?|war|conflict|history|election|treaty|attack|incident|movement|party|organization|company|collective|band|film|album|song|tournament|championship|season|district|province|country|university|government|territory|city/i.test(name)) return false;
+  if (/^(?:playback singer|singer|actor|actress|model|politician|athlete|writer|musician|journalist|scholar)$/i.test(name)) return false;
   if (/^(?:the )?(?:relations?|war|conflict|history|election|treaty|attack|incident)\b/i.test(bio)) return false;
   return /\b(actor|actress|activist|artist|athlete|businessman|businessperson|businesswoman|ceo|comedian|coach|cricketer|creator|doctor|economist|entrepreneur|footballer|founder|imam|influencer|journalist|lawyer|minister|model|musician|politician|president|professor|rapper|scholar|singer|streamer|writer|youtuber|born|died)\b/i.test(bio);
 }
