@@ -7,7 +7,7 @@ import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 import { scrapeSocialProfile } from './src/server/socialScraper';
 import { PersistentStore, StoreError } from './src/server/persistentStore';
-import { MATCH_REQUEST_PLANS } from './src/data/matchPricing';
+import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from './src/data/matchPricing';
 
 const ADMIN_COOKIE = 'v1_admin_session';
 const SESSION_COOKIE = 'v1_user_session';
@@ -76,6 +76,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/actors': 'Actors and Entertainers', '/entrepreneurs': 'Entrepreneurs Directory', '/pakistani-leaders': 'Pakistani Leaders', '/pakistani-scholars': 'Pakistani Scholars',
     '/international-stars': 'International Public Figures', '/vote-guide': '1v1Vote Voting Guide',
     '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map',
+    '/promote': 'Promote a Public Profile', '/ai': '1v1Vote AI Guide',
   };
   const titleOverrides: Record<string, string> = {
     '/about': 'About 1v1Vote - Public Opinion Rankings',
@@ -83,6 +84,8 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/faq': '1v1Vote FAQ - Public Figure Voting Questions',
     '/contact': 'Contact 1v1Vote - Profile Corrections',
     '/request': 'Request a Profile Review - 1v1Vote',
+    '/promote': 'Promote a Public Profile - 1v1Vote',
+    '/ai': '1v1Vote AI Guide - Public Figure Rankings and Sources',
     '/vote': 'Vote for Public Figures | 1v1Vote',
     '/vote-guide': '1v1Vote Voting Guide',
     '/site-map': '1v1Vote Site Map',
@@ -93,6 +96,8 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/faq': 'Answers to common questions about 1v1Vote voting, rankings, and profiles.',
     '/contact': 'Contact 1v1Vote about profile corrections and source information.',
     '/request': 'Request a correction or profile review for the 1v1Vote directory.',
+    '/promote': 'Request a transparent paid promotion for an active 1v1Vote public profile.',
+    '/ai': 'A machine-readable guide to 1v1Vote profiles, voting, rankings, promotions, and public sources.',
     '/vote': 'Support public figures you follow and help shape the live 1v1Vote ranking. Vote once every 24 hours with no account required.',
     '/vote-guide': 'A clear guide to voting, cooldowns, rankings, and profile pages.',
     '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
@@ -288,6 +293,14 @@ async function startServer() {
     });
   });
 
+  app.get('/api/promotion-config', (_req, res) => {
+    res.json({
+      plans: PROMOTION_PLANS,
+      paymentAccountLabel: process.env.PAYMENT_ACCOUNT_LABEL?.trim() || 'Payment details will be shown by the admin.',
+      paymentInstructions: process.env.PAYMENT_INSTRUCTIONS?.trim() || 'Submit your payment through the approved account and enter the transaction reference below. An admin verifies it before publishing.',
+    });
+  });
+
   app.get('/api/match-requests', (req, res) => {
     const user = getUser(req);
     if (!user) return res.status(401).json({ error: 'Please sign in to view your match requests.' });
@@ -299,6 +312,14 @@ async function startServer() {
     if (!user) return res.status(401).json({ error: 'Please sign in before submitting a match request.', code: 'AUTH_REQUIRED' });
     try {
       return res.status(201).json({ request: await store.createMatchRequest(user.id, req.body || {}) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/promotion-requests', async (req, res) => {
+    try {
+      return res.status(201).json({ request: await store.createPromotionRequest(req.body || {}) });
     } catch (error) {
       return errorResponse(res, error);
     }
@@ -406,6 +427,11 @@ async function startServer() {
     return res.json({ promotions: store.getPromotions() });
   });
 
+  app.get('/api/admin/promotion-requests', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ requests: store.getPromotionRequests() });
+  });
+
   app.post('/api/admin/promotions', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -419,6 +445,17 @@ async function startServer() {
     if (!requireAdmin(req, res)) return;
     try {
       return res.json({ promotion: await store.revokePromotion(req.params.promotionId) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/admin/promotion-requests/:requestId/review', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const decision = req.body?.decision === 'approve' ? 'approve' : req.body?.decision === 'reject' ? 'reject' : null;
+      if (!decision) return res.status(400).json({ error: 'A review decision is required.' });
+      return res.json({ request: await store.reviewPromotionRequest(req.params.requestId, decision, 'admin', String(req.body?.adminNote || '')) });
     } catch (error) {
       return errorResponse(res, error);
     }
@@ -571,9 +608,29 @@ async function startServer() {
     }
   });
 
+  app.get('/llms.txt', (_req, res) => {
+    res.type('text/plain').send(`# 1v1Vote
+  });
+
+  app.get('/ai-context.json', (_req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.json({
+      site: '1v1Vote',
+      siteUrl: siteOrigin(),
+      purpose: 'Public-opinion directory and daily voting index for notable people.',
+      rules: {
+        voteCooldownHours: 24,
+        ranking: 'organic votes descending, then shares descending, then name ascending',
+        paidPromotion: 'sponsored visibility only; never changes organic votes or ranking totals',
+      },
+      resources: { guide: `${siteOrigin()}/ai`, directory: `${siteOrigin()}/people`, sitemap: `${siteOrigin()}/sitemap.xml` },
+      profiles: store.getPeopleSnapshot().map((person) => ({ name: person.name, slug: person.slug, category: person.category, country: person.country, summary: person.shortBio, sourceUrl: person.profileUrl, profileUrl: `${siteOrigin()}/people/${person.slug}`, votes: person.votes, sponsored: Boolean(person.promotion) })),
+    });
+  });
+
   app.get('/sitemap.xml', (_req, res) => {
     const paths = new Set([
-      '/', '/request', '/about', '/how-it-works', '/rankings', '/people', '/vote', '/discover', '/profiles', '/sources',
+      '/', '/request', '/promote', '/ai', '/about', '/how-it-works', '/rankings', '/people', '/vote', '/discover', '/profiles', '/sources',
       '/editorial-policy', '/data-safety', '/privacy', '/terms', '/faq', '/contact', '/pakistan', '/india', '/usa', '/global',
       '/politics', '/religious-scholars', '/sports', '/entertainment', '/business', '/public-figures', '/leaders', '/scholars',
       '/athletes', '/actors', '/entrepreneurs', '/pakistani-leaders', '/pakistani-scholars', '/international-stars', '/vote-guide',
