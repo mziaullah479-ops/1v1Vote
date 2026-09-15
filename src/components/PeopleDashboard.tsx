@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronUp, Clock3, ExternalLink, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Check, ChevronUp, Clock3, ExternalLink, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
 import { Person, PersonCategory, PersonCountry } from '../types';
 import { SiteFooter } from './SiteFooter';
+import { LiveMarketBoard } from './LiveMarketBoard';
 import { trackEvent } from '../seo';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
@@ -87,6 +88,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
 
       <p className="relative mt-4 min-h-10 line-clamp-3 text-xs leading-relaxed text-slate-400">{person.bio || person.shortBio}</p>
       {person.promotion && <div className="relative mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-200"><Sparkles className="h-3 w-3" /> {person.promotion.label}</div>}
+      {person.market && <div className={`relative mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${person.market.change24h >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/30 bg-rose-400/10 text-rose-200'}`}>{person.market.change24h >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />} {person.market.change24h >= 0 ? '+' : ''}{person.market.change24h.toFixed(1)}% public signal / 24h</div>}
 
       <div className="relative mt-4 flex items-end justify-between border-t border-slate-800/80 pt-3">
         <div>
@@ -244,7 +246,8 @@ export const PeopleDashboard: React.FC = () => {
           </div>
         </section>
 
-        {people.length > 0 && <section className="mt-5 overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-r from-[#151125] via-[#0b1221] to-[#101b2b] p-4 shadow-xl sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300"><Sparkles className="h-3.5 w-3.5" /> Live signal</div><h2 className="mt-1 text-lg font-black text-white">Who leads the public pulse today?</h2></div><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Organic votes</span></div><div className="mt-4 grid gap-3 md:grid-cols-3">{people.slice(0, 3).map((person, index) => <a key={person.id} href={`/people/${encodeURIComponent(person.slug)}`} className={`group flex items-center gap-3 rounded-2xl border p-3 transition hover:-translate-y-0.5 ${index === 0 ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-[#080e1b]/70'}`}><span className="text-lg font-black text-amber-300">0{index + 1}</span><img src={person.avatar} alt="" width={42} height={42} loading="lazy" className="h-10 w-10 rounded-xl object-cover" /><span className="min-w-0"><span className="block truncate text-sm font-black text-white group-hover:text-sky-300">{person.name}</span><span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatCount(person.votes)} votes · {person.country}</span></span></a>)}</div></section>}
+         {people.length > 0 && <section className="mt-5 overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-r from-[#151125] via-[#0b1221] to-[#101b2b] p-4 shadow-xl sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300"><Sparkles className="h-3.5 w-3.5" /> Live signal</div><h2 className="mt-1 text-lg font-black text-white">Who leads the public pulse today?</h2></div><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Organic votes</span></div><div className="mt-4 grid gap-3 md:grid-cols-3">{people.slice(0, 3).map((person, index) => <a key={person.id} href={`/people/${encodeURIComponent(person.slug)}`} className={`group flex items-center gap-3 rounded-2xl border p-3 transition hover:-translate-y-0.5 ${index === 0 ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-[#080e1b]/70'}`}><span className="text-lg font-black text-amber-300">0{index + 1}</span><img src={person.avatar} alt="" width={42} height={42} loading="lazy" className="h-10 w-10 rounded-xl object-cover" /><span className="min-w-0"><span className="block truncate text-sm font-black text-white group-hover:text-sky-300">{person.name}</span><span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatCount(person.votes)} votes · {person.country}</span></span></a>)}</div></section>}
+         <LiveMarketBoard people={people} />
 
         <section className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div><h2 className="text-2xl font-black text-white">Most voted people</h2><p className="mt-1 text-xs text-slate-500">One dashboard for notable people from Pakistan and around the world</p></div>
