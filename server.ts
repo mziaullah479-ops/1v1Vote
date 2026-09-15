@@ -263,6 +263,15 @@ async function startServer() {
     }
   });
 
+  app.post('/api/people/:personId/view', async (req, res) => {
+    try {
+      const { identityKey } = getIdentity(req, res);
+      return res.json({ person: await store.recordPersonView(req.params.personId, identityKey) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
   app.get('/api/matches', (req, res) => {
     res.json(store.getSnapshot(getUser(req)?.id));
   });
@@ -440,6 +449,16 @@ async function startServer() {
     return res.json({ promotions: store.getPromotions() });
   });
 
+  app.get('/api/admin/audit', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ audit: store.getAudit(Number(req.query.limit) || 100) });
+  });
+
+  app.get('/api/admin/support-adjustments', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    return res.json({ adjustments: store.getSupportAdjustments(typeof req.query.personId === 'string' ? req.query.personId : undefined) });
+  });
+
   app.get('/api/admin/promotion-requests', (req, res) => {
     if (!requireAdmin(req, res)) return;
     return res.json({ requests: store.getPromotionRequests() });
@@ -449,6 +468,15 @@ async function startServer() {
     if (!requireAdmin(req, res)) return;
     try {
       return res.status(201).json({ promotion: await store.createPromotion(req.body || {}) });
+    } catch (error) {
+      return errorResponse(res, error);
+    }
+  });
+
+  app.post('/api/admin/people/:personId/support-credits', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      return res.json(await store.adjustSupportCredits(req.params.personId, Number(req.body?.delta), String(req.body?.reason || ''), 'admin'));
     } catch (error) {
       return errorResponse(res, error);
     }
@@ -644,8 +672,12 @@ async function startServer() {
         publicSignalMarket: 'modelled public-source and visible-reach trend index; never a financial price and never an automatic vote',
       },
       resources: { guide: `${siteOrigin()}/ai`, directory: `${siteOrigin()}/people`, sitemap: `${siteOrigin()}/sitemap.xml` },
-       profiles: store.getPeopleSnapshot().map((person) => ({ name: person.name, slug: person.slug, category: person.category, country: person.country, summary: person.shortBio, sourceUrl: person.profileUrl, profileUrl: `${siteOrigin()}/people/${person.slug}`, votes: person.votes, sponsored: Boolean(person.promotion), publicSignal: person.market?.publicSignal, signalIndex: person.market?.index, change24h: person.market?.change24h })),
+       profiles: store.getPeopleSnapshot().map((person) => ({ name: person.name, slug: person.slug, category: person.category, country: person.country, summary: person.shortBio, sourceUrl: person.profileUrl, profileUrl: `${siteOrigin()}/people/${person.slug}`, votes: person.votes, shares: person.shares, views: person.views || 0, socialGrowth24h: person.socialGrowth24h, sponsored: Boolean(person.promotion), publicSignal: person.market?.publicSignal, signalIndex: person.market?.index, change24h: person.market?.change24h })),
     });
+  });
+
+  app.get('/robots.txt', (_req, res) => {
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${siteOrigin()}/sitemap.xml\n`);
   });
 
   app.get('/sitemap.xml', (_req, res) => {
