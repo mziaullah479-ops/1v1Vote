@@ -6,6 +6,8 @@ export type PromotionRequestStatus = 'pending' | 'approved' | 'rejected';
 export type PersonCategory = 'Public Figure' | 'Religious Scholar' | 'Politics' | 'Creator' | 'Sports' | 'Entertainment' | 'Business';
 export type PersonCountry = 'Pakistan' | 'India' | 'USA' | 'Global';
 export type PeopleAutomationState = 'idle' | 'running' | 'active' | 'source-refresh' | 'error';
+export type MarketPeriod = '1D' | '1W' | '1M' | '1Y' | '5Y';
+export type MarketTrend = 'up' | 'down' | 'flat';
 
 export interface PeopleAutomationStatus {
   enabled: boolean;
@@ -41,6 +43,30 @@ export interface Person {
   lastResearchedAt?: string;
   archivedAt?: string;
   promotion?: PersonPromotion;
+  market?: PersonMarket;
+}
+
+export interface PersonMarketPoint {
+  timestamp: string;
+  label: string;
+  value: number;
+}
+
+export interface PersonMarket {
+  index: number;
+  publicSignal: number;
+  communityVotes: number;
+  activity24h: number;
+  change24h: number;
+  change7d: number;
+  change30d: number;
+  change1y: number;
+  change5y: number;
+  trend: MarketTrend;
+  history: Record<MarketPeriod, PersonMarketPoint[]>;
+  dataMode: 'public-signal-model';
+  lastUpdatedAt: string;
+  sources: string[];
 }
 
 export interface PersonPromotion {
