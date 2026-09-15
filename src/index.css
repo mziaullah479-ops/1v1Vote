@@ -5,12 +5,12 @@
     min-width: 320px;
     overflow-x: hidden;
     scroll-behavior: smooth;
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
-    background-color: #070a13;
-    color: #f1f5f9;
+    background-color: #f5f8fc;
+    color: #0f172a;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     overflow-x: hidden;
   }
@@ -27,6 +27,57 @@
     outline: 2px solid #38bdf8;
     outline-offset: 3px;
   }
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+html[data-theme='dark'] body {
+  background-color: #070a13;
+  color: #f1f5f9;
+}
+
+html[data-theme='light'] body {
+  background-image: radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 34rem);
+}
+
+html[data-theme='light'] [class*='bg-[#060a13'],
+html[data-theme='light'] [class*='bg-[#070a13'],
+html[data-theme='light'] [class*='bg-[#070b15'],
+html[data-theme='light'] [class*='bg-[#070c17'],
+html[data-theme='light'] [class*='bg-[#060b17'],
+html[data-theme='light'] [class*='bg-[#0b1221'],
+html[data-theme='light'] [class*='bg-[#0b1b1d'],
+html[data-theme='light'] [class*='bg-[#080d18'],
+html[data-theme='light'] [class*='bg-[#080e1b'],
+html[data-theme='light'] [class*='bg-slate-950'],
+html[data-theme='light'] [class*='bg-slate-900'] {
+  background-color: #ffffff !important;
+}
+
+html[data-theme='light'] [class*='bg-gradient-to'] {
+  background-image: linear-gradient(135deg, #ffffff, #eef6ff) !important;
+}
+
+html[data-theme='light'] [class*='text-white'],
+html[data-theme='light'] [class*='text-slate-100'],
+html[data-theme='light'] [class*='text-slate-200'] {
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] [class*='text-slate-300'] { color: #334155 !important; }
+html[data-theme='light'] [class*='text-slate-400'] { color: #475569 !important; }
+html[data-theme='light'] [class*='text-slate-500'] { color: #64748b !important; }
+html[data-theme='light'] [class*='text-slate-600'] { color: #64748b !important; }
+html[data-theme='light'] [class*='border-slate-800'] { border-color: #dbe5ef !important; }
+html[data-theme='light'] [class*='border-slate-700'] { border-color: #cbd5e1 !important; }
+html[data-theme='light'] input,
+html[data-theme='light'] select,
+html[data-theme='light'] textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* Glowing arena animations & utility classes */

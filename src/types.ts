@@ -39,11 +39,30 @@ export interface Person {
   subscriberCountRaw?: number;
   votes: number;
   shares: number;
+  views?: number;
+  viewHistory?: PersonViewPoint[];
+  supportCredits?: number;
+  socialGrowth24h?: number;
+  socialLastCheckedAt?: string;
   updatedAt: string;
   lastResearchedAt?: string;
   archivedAt?: string;
   promotion?: PersonPromotion;
   market?: PersonMarket;
+}
+
+export interface PersonViewPoint {
+  date: string;
+  views: number;
+}
+
+export interface SupportCreditAdjustment {
+  id: string;
+  personId: string;
+  delta: number;
+  reason: string;
+  actorId: string;
+  createdAt: string;
 }
 
 export interface PersonMarketPoint {
