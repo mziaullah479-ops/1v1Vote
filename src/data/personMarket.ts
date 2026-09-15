@@ -49,15 +49,17 @@ function makeHistory(index: number, change: number, period: MarketPeriod, seed: 
   return points;
 }
 
-export function buildPersonMarket(person: Pick<Person, 'id' | 'name' | 'profileUrl' | 'verified' | 'followersCount' | 'subscriberCountRaw' | 'votes' | 'shares' | 'updatedAt'>, now = Date.now()): PersonMarket {
+export function buildPersonMarket(person: Pick<Person, 'id' | 'name' | 'profileUrl' | 'verified' | 'followersCount' | 'subscriberCountRaw' | 'votes' | 'shares' | 'views' | 'viewHistory' | 'socialGrowth24h' | 'updatedAt'>, now = Date.now()): PersonMarket {
   const seed = stableHash(`${person.id}:${person.name}`);
   const reach = person.subscriberCountRaw || parseReach(person.followersCount);
   const reachBoost = Math.min(30, reach > 0 ? Math.log10(reach + 1) * 5 : 0);
   const sourceBoost = person.profileUrl?.includes('wikipedia.org') ? 10 : 5;
-  const publicSignal = Math.round(clamp(45 + (seed % 25) + reachBoost + sourceBoost + (person.verified ? 5 : 0), 1, 100));
+  const viewBoost = Math.min(12, Math.log10((person.views || 0) + 1) * 2.5);
+  const socialBoost = clamp(person.socialGrowth24h || 0, -8, 8);
+  const publicSignal = Math.round(clamp(45 + (seed % 25) + reachBoost + sourceBoost + viewBoost + socialBoost + (person.verified ? 5 : 0), 1, 100));
   const index = Number((publicSignal * 8 + 120 + (seed % 80)).toFixed(1));
   const changes = {
-    '1D': Number((((seed % 170) - 85) / 10).toFixed(1)),
+    '1D': Number(((((seed % 170) - 85) / 10) + (person.socialGrowth24h || 0) * 0.35 + Math.min(3, (person.views || 0) / 100)).toFixed(1)),
     '1W': Number(((((seed >> 4) % 260) - 130) / 10).toFixed(1)),
     '1M': Number(((((seed >> 8) % 360) - 150) / 10).toFixed(1)),
     '1Y': Number(((((seed >> 12) % 520) - 120) / 10).toFixed(1)),
@@ -74,7 +76,7 @@ export function buildPersonMarket(person: Pick<Person, 'id' | 'name' | 'profileU
     index,
     publicSignal,
     communityVotes: person.votes,
-    activity24h: person.votes + person.shares,
+    activity24h: person.votes + person.shares + (person.views || 0),
     change24h: changes['1D'],
     change7d: changes['1W'],
     change30d: changes['1M'],
@@ -84,6 +86,6 @@ export function buildPersonMarket(person: Pick<Person, 'id' | 'name' | 'profileU
     history,
     dataMode: 'public-signal-model',
     lastUpdatedAt: new Date(now).toISOString(),
-    sources: ['Public source profile', 'Visible social reach where available', 'Organic 1v1Vote activity kept separate'],
+    sources: ['Public source profile', 'Recorded profile views', 'Visible social reach where available', 'Organic 1v1Vote activity kept separate'],
   };
 }
