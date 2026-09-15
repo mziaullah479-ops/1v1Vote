@@ -5,6 +5,7 @@
     min-width: 320px;
     overflow-x: hidden;
     scroll-behavior: smooth;
+    color-scheme: dark;
   }
 
   body {
