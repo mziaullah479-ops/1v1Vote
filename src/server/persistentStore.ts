@@ -5,6 +5,7 @@ import { createClient, type Client } from '@libsql/client';
 import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, PromotionRequest, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from '../data/matchPricing';
+import { buildPersonMarket } from '../data/personMarket';
 import { scrapeSocialProfile } from './socialScraper';
 
 type Role = 'user' | 'admin';
@@ -413,7 +414,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     people: mergedPeople.map((person) => {
       const seed = seeded.people.find((item) => item.slug === person.slug);
       const useSeedIdentity = Boolean(seed && isPlaceholderAvatar(person.avatar));
-      return {
+      const normalized: Person = {
         ...person,
         name: canonicalNames.get(person.id) || person.name,
         avatar: isPlaceholderAvatar(person.avatar) && seed?.avatar ? seed.avatar : person.avatar,
@@ -425,6 +426,8 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
         shares: resetPeopleActivity ? 0 : person.shares || 0,
         updatedAt: person.updatedAt || nowIso(),
       };
+      normalized.market = normalized.market || buildPersonMarket(normalized);
+      return normalized;
     }),
     promotions: Array.isArray(input.promotions) ? input.promotions : [],
     promotionRequests: Array.isArray(input.promotionRequests) ? input.promotionRequests : [],
@@ -563,7 +566,11 @@ export class PersistentStore {
   }
 
   getPeopleSnapshot() {
-    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map((person) => ({ ...person, promotion: this.activePromotionFor(person.id) }))).sort((left, right) => {
+    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map((person) => ({
+      ...person,
+      market: person.market ? { ...person.market, history: { '1D': [], '1W': [], '1M': [], '1Y': [], '5Y': [] } } : undefined,
+      promotion: this.activePromotionFor(person.id),
+    }))).sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;
       if (right.shares !== left.shares) return right.shares - left.shares;
       return left.name.localeCompare(right.name);
@@ -576,7 +583,11 @@ export class PersistentStore {
   }
 
   getAdminPeopleSnapshot() {
-    return clone(this.state.people.map((person) => ({ ...person, promotion: this.activePromotionFor(person.id) }))).sort((left, right) => {
+    return clone(this.state.people.map((person) => ({
+      ...person,
+      market: person.market ? { ...person.market, history: { '1D': [], '1W': [], '1M': [], '1Y': [], '5Y': [] } } : undefined,
+      promotion: this.activePromotionFor(person.id),
+    }))).sort((left, right) => {
       if (Boolean(left.archivedAt) !== Boolean(right.archivedAt)) return left.archivedAt ? 1 : -1;
       return left.name.localeCompare(right.name);
     });
@@ -725,11 +736,13 @@ export class PersistentStore {
       updatedAt: now,
       lastResearchedAt: existing?.lastResearchedAt,
       archivedAt: existing?.archivedAt,
+      market: existing?.market,
     };
   }
 
   async createPerson(input: Partial<Person>, actorId = 'admin') {
     const person = this.personInput(input);
+    person.market = person.market || buildPersonMarket(person);
     if (this.state.people.some((item) => item.slug === person.slug || item.name.toLowerCase() === person.name.toLowerCase())) {
       throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
     }
@@ -773,7 +786,7 @@ export class PersistentStore {
   }
 
   async voteForPerson(personId: string, identityKey: string) {
-    const person = this.getPerson(personId);
+    const person = this.state.people.find((item) => !item.archivedAt && (item.id === personId || item.slug === personId));
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
 
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
@@ -788,23 +801,25 @@ export class PersistentStore {
     const now = nowIso();
     person.votes += 1;
     person.updatedAt = now;
+    person.market = { ...(person.market || buildPersonMarket(person)), communityVotes: person.votes, activity24h: person.votes + person.shares, lastUpdatedAt: now };
     this.state.personVotes = [
       ...this.state.personVotes.filter((vote) => new Date(vote.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000),
       { personId: person.id, identityKey, createdAt: now },
     ];
     await this.audit('person_vote', undefined, { personId: person.id });
     await this.persist();
-    return clone(person);
+    return clone(this.getPerson(person.id));
   }
 
   async sharePerson(personId: string) {
-    const person = this.getPerson(personId);
+    const person = this.state.people.find((item) => !item.archivedAt && (item.id === personId || item.slug === personId));
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
     person.shares += 1;
     person.updatedAt = nowIso();
+    person.market = { ...(person.market || buildPersonMarket(person)), communityVotes: person.votes, activity24h: person.votes + person.shares, lastUpdatedAt: person.updatedAt };
     await this.audit('person_share', undefined, { personId: person.id });
     await this.persist();
-    return clone(person);
+    return clone(this.getPerson(person.id));
   }
 
   async refreshPeopleProfiles() {
@@ -830,6 +845,8 @@ export class PersistentStore {
         if ('subscriberCountRaw' in result) person.subscriberCountRaw = result.subscriberCountRaw || person.subscriberCountRaw;
         person.lastResearchedAt = nowIso();
         person.updatedAt = nowIso();
+        const refreshedMarket = buildPersonMarket(person);
+        person.market = { ...(person.market || refreshedMarket), index: refreshedMarket.index, publicSignal: refreshedMarket.publicSignal, lastUpdatedAt: person.updatedAt };
         refreshed += 1;
       } catch (error) {
         console.error(`Profile refresh failed for ${person.slug}`, error);
@@ -897,6 +914,7 @@ export class PersistentStore {
           updatedAt: now,
           lastResearchedAt: now,
         };
+        person.market = buildPersonMarket(person);
         this.state.people.push(person);
         existingKeys.add(name.toLowerCase());
         existingKeys.add(slug);
@@ -914,7 +932,7 @@ export class PersistentStore {
     const current = this.state.peopleAutomation;
     if (this.peopleAutomationBusy) return this.getAutomationStatus();
     if (!force && current.paused) return this.getAutomationStatus();
-    if (!force && current.discoveryVersion === 4 && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < PEOPLE_AUTOMATION_INTERVAL_MS) {
+    if (!force && current.discoveryVersion && current.lastRunAt && Date.now() - new Date(current.lastRunAt).getTime() < PEOPLE_AUTOMATION_INTERVAL_MS) {
       return this.getAutomationStatus();
     }
     this.peopleAutomationBusy = true;
