@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'n
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
-import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, PromotionRequest, UserProfile } from '../types';
+import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, PromotionRequest, SupportCreditAdjustment, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from '../data/matchPricing';
 import { buildPersonMarket } from '../data/personMarket';
@@ -55,6 +55,13 @@ interface StoredPersonVote {
   createdAt: string;
 }
 
+interface StoredPersonView {
+  personId: string;
+  identityKey: string;
+  day: string;
+  createdAt: string;
+}
+
 interface StoredAdminSession {
   tokenHash: string;
   expiresAt: number;
@@ -79,6 +86,8 @@ interface DatabaseState {
   sessions: StoredSession[];
   votes: StoredVote[];
   personVotes: StoredPersonVote[];
+  personViews: StoredPersonView[];
+  supportAdjustments: SupportCreditAdjustment[];
   likes: StoredLike[];
   commentLikes: StoredCommentLike[];
   adminSessions: StoredAdminSession[];
@@ -99,7 +108,7 @@ interface DiscoveryCandidate {
   popularity?: number;
 }
 
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const PEOPLE_REFRESH_LIMIT = 25;
 const AUTO_PROFILE_BLOCKLIST = new Set([
@@ -373,6 +382,8 @@ function emptyState(): DatabaseState {
     sessions: [],
     votes: [],
     personVotes: [],
+    personViews: [],
+    supportAdjustments: [],
     likes: [],
     commentLikes: [],
     adminSessions: [],
@@ -424,6 +435,9 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
         archivedAt: person.archivedAt || (shouldArchivePerson(person) ? nowIso() : undefined),
         votes: resetPeopleActivity ? 0 : person.votes || 0,
         shares: resetPeopleActivity ? 0 : person.shares || 0,
+        views: resetPeopleActivity ? 0 : person.views || 0,
+        viewHistory: Array.isArray(person.viewHistory) ? person.viewHistory.slice(-90) : [],
+        supportCredits: person.supportCredits || 0,
         updatedAt: person.updatedAt || nowIso(),
       };
       normalized.market = normalized.market || buildPersonMarket(normalized);
@@ -436,6 +450,8 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     sessions: Array.isArray(input.sessions) ? input.sessions : [],
     votes: Array.isArray(input.votes) ? input.votes : [],
     personVotes: resetPeopleActivity ? [] : Array.isArray(input.personVotes) ? input.personVotes : [],
+    personViews: Array.isArray(input.personViews) ? input.personViews : [],
+    supportAdjustments: Array.isArray(input.supportAdjustments) ? input.supportAdjustments : [],
     likes: Array.isArray(input.likes) ? input.likes : [],
     commentLikes: Array.isArray(input.commentLikes) ? input.commentLikes : [],
     adminSessions: Array.isArray(input.adminSessions) ? input.adminSessions : [],
@@ -733,6 +749,11 @@ export class PersistentStore {
       subscriberCountRaw: input.subscriberCountRaw ?? existing?.subscriberCountRaw,
       votes: existing?.votes || 0,
       shares: existing?.shares || 0,
+      views: existing?.views || 0,
+      viewHistory: existing?.viewHistory || [],
+      supportCredits: existing?.supportCredits || 0,
+      socialGrowth24h: existing?.socialGrowth24h,
+      socialLastCheckedAt: existing?.socialLastCheckedAt,
       updatedAt: now,
       lastResearchedAt: existing?.lastResearchedAt,
       archivedAt: existing?.archivedAt,
@@ -801,7 +822,7 @@ export class PersistentStore {
     const now = nowIso();
     person.votes += 1;
     person.updatedAt = now;
-    person.market = { ...(person.market || buildPersonMarket(person)), communityVotes: person.votes, activity24h: person.votes + person.shares, lastUpdatedAt: now };
+    person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares + (person.views || 0), lastUpdatedAt: now };
     this.state.personVotes = [
       ...this.state.personVotes.filter((vote) => new Date(vote.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000),
       { personId: person.id, identityKey, createdAt: now },
@@ -816,10 +837,60 @@ export class PersistentStore {
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
     person.shares += 1;
     person.updatedAt = nowIso();
-    person.market = { ...(person.market || buildPersonMarket(person)), communityVotes: person.votes, activity24h: person.votes + person.shares, lastUpdatedAt: person.updatedAt };
+    person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares + (person.views || 0), lastUpdatedAt: person.updatedAt };
     await this.audit('person_share', undefined, { personId: person.id });
     await this.persist();
     return clone(this.getPerson(person.id));
+  }
+
+  async recordPersonView(personId: string, identityKey: string) {
+    const person = this.state.people.find((item) => !item.archivedAt && (item.id === personId || item.slug === personId));
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+    const now = nowIso();
+    const day = now.slice(0, 10);
+    const alreadyCounted = this.state.personViews.some((view) => view.personId === person.id && view.identityKey === identityKey && view.day === day);
+    if (!alreadyCounted) {
+      person.views = (person.views || 0) + 1;
+      const history = Array.isArray(person.viewHistory) ? person.viewHistory : [];
+      const today = history.find((point) => point.date === day);
+      if (today) today.views += 1;
+      else history.push({ date: day, views: 1 });
+      person.viewHistory = history.slice(-90);
+      person.updatedAt = now;
+      this.state.personViews = [
+        ...this.state.personViews.filter((view) => new Date(view.createdAt).getTime() > Date.now() - 90 * 24 * 60 * 60 * 1000),
+        { personId: person.id, identityKey, day, createdAt: now },
+      ];
+      person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares + (person.views || 0), lastUpdatedAt: now };
+      await this.persist();
+    }
+    return clone(this.getPerson(person.id));
+  }
+
+  async adjustSupportCredits(personId: string, delta: number, reason: string, actorId = 'admin') {
+    const person = this.state.people.find((item) => item.id === personId && !item.archivedAt);
+    const amount = Math.trunc(delta);
+    const note = reason.trim().slice(0, 240);
+    if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
+    if (!Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 100000) throw new StoreError('INVALID_SUPPORT_CREDIT', 'Enter a support credit change between -100,000 and 100,000.');
+    if (!note) throw new StoreError('SUPPORT_REASON_REQUIRED', 'A reason is required for every support credit change.');
+    const next = (person.supportCredits || 0) + amount;
+    if (next < 0) throw new StoreError('SUPPORT_CREDIT_BELOW_ZERO', 'Support credits cannot go below zero.');
+    const adjustment: SupportCreditAdjustment = { id: `support-${randomUUID()}`, personId: person.id, delta: amount, reason: note, actorId, createdAt: nowIso() };
+    person.supportCredits = next;
+    person.updatedAt = adjustment.createdAt;
+    this.state.supportAdjustments.unshift(adjustment);
+    await this.audit('person.support_credit.adjusted', actorId, { personId: person.id, delta: amount, reason: note, organicVotesUnchanged: true });
+    await this.persist();
+    return { person: clone(this.getPerson(person.id)), adjustment: clone(adjustment) };
+  }
+
+  getSupportAdjustments(personId?: string) {
+    return clone(this.state.supportAdjustments.filter((item) => !personId || item.personId === personId).slice(0, 200));
+  }
+
+  getAudit(limit = 100) {
+    return clone(this.state.audit.slice(0, Math.min(500, Math.max(1, limit))));
   }
 
   async refreshPeopleProfiles() {
@@ -833,6 +904,7 @@ export class PersistentStore {
       if (!researchUrl) continue;
       try {
         const isSocialProfile = /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitch\.tv/i.test(researchUrl);
+        const previousFollowers = person.subscriberCountRaw || 0;
         const result = isSocialProfile
           ? await scrapeSocialProfile(researchUrl, person.name)
           : await fetchPublicProfileSummary(researchUrl);
@@ -845,6 +917,13 @@ export class PersistentStore {
         if ('subscriberCountRaw' in result) person.subscriberCountRaw = result.subscriberCountRaw || person.subscriberCountRaw;
         person.lastResearchedAt = nowIso();
         person.updatedAt = nowIso();
+        if (isSocialProfile) {
+          const currentFollowers = person.subscriberCountRaw || 0;
+          person.socialGrowth24h = previousFollowers > 0 && currentFollowers > 0
+            ? Number((((currentFollowers - previousFollowers) / previousFollowers) * 100).toFixed(2))
+            : undefined;
+          person.socialLastCheckedAt = person.updatedAt;
+        }
         const refreshedMarket = buildPersonMarket(person);
         person.market = { ...(person.market || refreshedMarket), index: refreshedMarket.index, publicSignal: refreshedMarket.publicSignal, lastUpdatedAt: person.updatedAt };
         refreshed += 1;
