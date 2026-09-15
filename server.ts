@@ -225,6 +225,19 @@ async function startServer() {
     res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
   });
 
+  app.get('/api/people/market', (_req, res) => {
+    const people = store.getPeopleSnapshot().map((person) => ({
+      id: person.id,
+      slug: person.slug,
+      name: person.name,
+      avatar: person.avatar,
+      category: person.category,
+      country: person.country,
+      market: person.market,
+    }));
+    return res.json({ people, updatedAt: new Date().toISOString(), disclaimer: 'Public-signal model, not a financial price or an organic vote.' });
+  });
+
   app.get('/api/people/:personId', (req, res) => {
     const person = store.getPerson(req.params.personId);
     if (!person) return res.status(404).json({ error: 'Profile not found.' });
@@ -628,9 +641,10 @@ async function startServer() {
         voteCooldownHours: 24,
         ranking: 'organic votes descending, then shares descending, then name ascending',
         paidPromotion: 'sponsored visibility only; never changes organic votes or ranking totals',
+        publicSignalMarket: 'modelled public-source and visible-reach trend index; never a financial price and never an automatic vote',
       },
       resources: { guide: `${siteOrigin()}/ai`, directory: `${siteOrigin()}/people`, sitemap: `${siteOrigin()}/sitemap.xml` },
-      profiles: store.getPeopleSnapshot().map((person) => ({ name: person.name, slug: person.slug, category: person.category, country: person.country, summary: person.shortBio, sourceUrl: person.profileUrl, profileUrl: `${siteOrigin()}/people/${person.slug}`, votes: person.votes, sponsored: Boolean(person.promotion) })),
+       profiles: store.getPeopleSnapshot().map((person) => ({ name: person.name, slug: person.slug, category: person.category, country: person.country, summary: person.shortBio, sourceUrl: person.profileUrl, profileUrl: `${siteOrigin()}/people/${person.slug}`, votes: person.votes, sponsored: Boolean(person.promotion), publicSignal: person.market?.publicSignal, signalIndex: person.market?.index, change24h: person.market?.change24h })),
     });
   });
 
