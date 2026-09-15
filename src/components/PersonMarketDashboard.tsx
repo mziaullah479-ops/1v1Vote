@@ -73,13 +73,15 @@ export const PersonMarketDashboard: React.FC<{ person: Person }> = ({ person }) 
         </div>
       </div>
 
-      <div className="grid gap-3 border-b border-slate-800/80 p-5 sm:grid-cols-2 sm:p-7 lg:grid-cols-5">
+      <div className="grid gap-3 border-b border-slate-800/80 p-5 sm:grid-cols-2 sm:p-7 lg:grid-cols-6">
         {[
           ['Public signal', `${market.publicSignal}/100`, 'Source and reach model', <TrendingUp className="h-4 w-4 text-emerald-300" />],
           ['24h change', formatPercent(market.change24h), 'Selected public trend', market.change24h >= 0 ? <ArrowUpRight className="h-4 w-4 text-emerald-300" /> : <ArrowDownRight className="h-4 w-4 text-rose-300" />],
           ['7d change', formatPercent(market.change7d), 'Weekly direction', market.change7d >= 0 ? <ArrowUpRight className="h-4 w-4 text-emerald-300" /> : <ArrowDownRight className="h-4 w-4 text-rose-300" />],
           ['1y change', formatPercent(market.change1y), 'Long-term model', market.change1y >= 0 ? <ArrowUpRight className="h-4 w-4 text-emerald-300" /> : <ArrowDownRight className="h-4 w-4 text-rose-300" />],
-          ['Community activity', formatNumber(market.activity24h), 'Votes + shares, separate', <Activity className="h-4 w-4 text-sky-300" />],
+          ['Community activity', formatNumber(market.activity24h), 'Votes + shares + views, separate', <Activity className="h-4 w-4 text-sky-300" />],
+          ['Profile views', formatNumber(person.views || 0), 'Deduplicated public visits', <Radio className="h-4 w-4 text-sky-300" />],
+          ['Social growth', typeof person.socialGrowth24h === 'number' ? formatPercent(person.socialGrowth24h) : 'Not checked', 'Fresh social snapshot', <TrendingUp className="h-4 w-4 text-amber-300" />],
         ].map(([label, value, caption, icon]) => <div key={String(label)} className="rounded-2xl border border-slate-800 bg-[#070d18] p-4"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-500"><span>{label}</span>{icon}</div><div className="mt-2 text-xl font-black text-white">{value}</div><div className="mt-1 text-[10px] text-slate-600">{caption}</div></div>)}
       </div>
 
@@ -91,4 +93,3 @@ export const PersonMarketDashboard: React.FC<{ person: Person }> = ({ person }) 
     </section>
   );
 };
-

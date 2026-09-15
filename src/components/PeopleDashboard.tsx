@@ -93,9 +93,9 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
       <div className="relative mt-4 flex items-end justify-between border-t border-slate-800/80 pt-3">
         <div>
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-            <ChevronUp className="h-3.5 w-3.5 text-emerald-400" /> Live votes
+            <ChevronUp className="h-3.5 w-3.5 text-emerald-400" /> Organic votes
           </div>
-          <div className="mt-1 text-2xl font-black tracking-tight text-white">{formatCount(person.votes)}</div>
+          <div className="mt-1 flex items-end gap-2"><span className="text-2xl font-black tracking-tight text-white">{formatCount(person.votes)}</span><span className="text-[10px] font-bold text-slate-500">{formatCount(person.views || 0)} views</span></div>
         </div>
         <div className="flex items-end gap-3">
           {person.followersCount && <span className="text-right text-[10px] font-bold text-slate-500">{person.followersCount}<br />followers</span>}
