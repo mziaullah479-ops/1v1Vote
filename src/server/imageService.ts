@@ -49,6 +49,7 @@ function requestUrl(input: string, width: number) {
       const name = thumb ? file.replace(/^\d+px-/i, '') : file;
       const folderPath = thumb ? folders.join('/') : folders.join('/') + '/' + name;
       url.pathname = '/wikipedia/commons/thumb/' + folderPath + '/' + size + 'px-' + name;
+      return 'https://images.weserv.nl/?url=' + encodeURIComponent(url.toString()) + '&w=' + size + '&output=webp';
     }
   } else if (url.hostname.endsWith('googleusercontent.com')) {
     url.pathname = url.pathname.replace(/=s\d+/i, '=s' + size);
@@ -123,7 +124,7 @@ async function fetchImage(input: string, width: number, depth: number, visited: 
     const body = Buffer.from(await response.arrayBuffer());
     if (body.length > limit) throw new ImageFetchError('The remote image is too large.');
     const type = contentType(header, body);
-    if (type) return { sourceUrl: normalizeImageUrl(response.url || target), contentType: type, body };
+    if (type) return { sourceUrl: normalized, contentType: type, body };
     if (!header.toLowerCase().includes('html')) throw new ImageFetchError('The URL did not return an image.');
     const image = pageImage(body.toString('utf8'), target);
     if (!image) throw new ImageFetchError('No public image was found on that page.');
