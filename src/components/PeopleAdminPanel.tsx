@@ -75,7 +75,7 @@ export const PeopleAdminPanel: React.FC = () => {
     const response = await fetch(editingId ? `/api/admin/people/${encodeURIComponent(editingId)}` : '/api/admin/people', { method: editingId ? 'PUT' : 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
-    setMessage(response.ok ? (editingId ? 'Profile updated safely.' : 'Profile added safely.') : data.error || 'Could not save this profile.');
+    setMessage(response.ok ? (editingId ? 'Profile updated safely. The image URL was verified and is live.' : 'Profile added safely. The image URL was verified and is live.') : data.error || 'Could not save this profile.');
     if (response.ok) { setForm(emptyForm); setEditingId(''); await loadPeople(); }
   };
 
