@@ -58,7 +58,7 @@ export const PersonMarketDashboard: React.FC<{ person: Person }> = ({ person }) 
   const areaPath = values.length ? `${chartPath} L ${chartWidth - 18} ${chartHeight - 18} L 18 ${chartHeight - 18} Z` : '';
 
   return (
-    <section className="mt-7 overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-[#0b1b1d] via-[#0b1221] to-[#080d18] shadow-2xl">
+    <section className="market-dashboard mt-7 overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-gradient-to-br from-[#0b1b1d] via-[#0b1221] to-[#080d18] shadow-2xl">
       <div className="border-b border-slate-800/80 p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>

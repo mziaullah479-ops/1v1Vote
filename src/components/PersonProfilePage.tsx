@@ -51,10 +51,10 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
 
   if (!person) return <main className="flex min-h-screen items-center justify-center bg-[#060a13] px-4 text-center text-sm text-slate-400">{message}</main>;
 
-  return <main className="min-h-screen bg-[#060a13] px-4 py-8 text-slate-100 sm:px-6 sm:py-14">
+  return <main className="profile-page min-h-screen bg-[#060a13] px-4 py-8 text-slate-100 sm:px-6 sm:py-14">
     <div className="mx-auto max-w-5xl">
       <a href="/" className="inline-flex items-center gap-2 text-xs font-bold text-sky-300 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to live rankings</a>
-      <article className="mt-8 overflow-hidden rounded-[2rem] border border-sky-500/20 bg-gradient-to-br from-[#0d1b36] to-[#0a0e19] shadow-2xl">
+      <article className="profile-hero mt-8 overflow-hidden rounded-[2rem] border border-sky-500/20 bg-gradient-to-br from-[#0d1b36] to-[#0a0e19] shadow-2xl">
         <div className="grid gap-8 p-6 sm:grid-cols-[220px_1fr] sm:p-10">
           <div className="mx-auto h-48 w-48 overflow-hidden rounded-[2rem] border border-sky-400/40 bg-slate-900 shadow-xl sm:mx-0 sm:h-56 sm:w-56"><img src={person.avatar} alt={person.name} width={224} height={224} decoding="async" className="h-full w-full object-cover" /></div>
           <div>
@@ -66,7 +66,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
             {message && <p className="mt-4 text-xs font-bold text-emerald-300">{message}</p>}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 border-t border-slate-800/80 p-5 sm:grid-cols-4 sm:p-7">
+        <div className="profile-stat-grid grid grid-cols-3 gap-3 border-t border-slate-800/80 p-5 sm:grid-cols-4 sm:p-7">
           <div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Organic votes</div><div className="mt-1 text-2xl font-black text-white">{formatCount(person.votes)}</div></div>
           <div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Profile views</div><div className="mt-1 text-2xl font-black text-white">{formatCount(person.views || 0)}</div></div>
           <div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Shares</div><div className="mt-1 text-2xl font-black text-white">{formatCount(person.shares)}</div></div>
@@ -75,7 +75,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
       </article>
       {person.supportCredits ? <p className="mt-3 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-100">Administrative support credit is disclosed separately and does not count as an organic vote or affect the organic ranking.</p> : null}
       <PersonMarketDashboard person={person} />
-      <section className="mt-6 rounded-3xl border border-slate-800 bg-[#0b1221] p-6"><h2 className="text-xl font-black text-white">About {person.name}</h2><p className="mt-3 text-sm leading-7 text-slate-300">{person.bio || person.shortBio}</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Category</div><div className="mt-1 text-sm font-bold text-white">{person.category}</div></div><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Country</div><div className="mt-1 text-sm font-bold text-white">{person.country}</div></div>{person.profileUrl && <a href={person.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-sky-300 hover:text-white">Open public source <ExternalLink className="h-4 w-4" /></a>}</div></section>
+      <section className="profile-about mt-6 rounded-3xl border border-slate-800 bg-[#0b1221] p-6"><h2 className="text-xl font-black text-white">About {person.name}</h2><p className="mt-3 text-sm leading-7 text-slate-300">{person.bio || person.shortBio}</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Category</div><div className="mt-1 text-sm font-bold text-white">{person.category}</div></div><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Country</div><div className="mt-1 text-sm font-bold text-white">{person.country}</div></div>{person.profileUrl && <a href={person.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-sky-300 hover:text-white">Open public source <ExternalLink className="h-4 w-4" /></a>}</div></section>
     </div>
   </main>;
 };
