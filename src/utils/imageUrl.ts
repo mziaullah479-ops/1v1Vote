@@ -3,7 +3,7 @@ export function imageVariant(url: string, width: number) {
     const parsed = new URL(url);
     const safeWidth = Math.max(64, Math.round(width));
 
-    if (parsed.hostname === 'upload.wikimedia.org') {
+    if (parsed.hostname === 'upload.wikimedia.org' || parsed.hostname === 'thumb.wikimedia.org') {
       const parts = parsed.pathname.split('/').filter(Boolean);
       if (parts[0] === 'wikipedia' && parts[1] === 'commons' && parts.length >= 4) {
         const fileName = parts[parts.length - 1];
