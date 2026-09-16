@@ -111,6 +111,52 @@ interface DiscoveryCandidate {
 const DATABASE_VERSION = 5;
 const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const PEOPLE_REFRESH_LIMIT = 25;
+const DEFAULT_VOTE_RESET_TIME_ZONE = 'Asia/Karachi';
+
+function resolveVoteResetTimeZone() {
+  const candidate = process.env.VOTE_RESET_TIME_ZONE?.trim() || DEFAULT_VOTE_RESET_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format();
+    return candidate;
+  } catch {
+    return DEFAULT_VOTE_RESET_TIME_ZONE;
+  }
+}
+
+const VOTE_RESET_TIME_ZONE = resolveVoteResetTimeZone();
+
+function zonedParts(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: VOTE_RESET_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(value);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
+}
+
+function calendarDay(value: Date | string) {
+  const parts = zonedParts(typeof value === 'string' ? new Date(value) : value);
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+function timeZoneOffsetMs(value: Date) {
+  const parts = zonedParts(value);
+  const instant = Math.floor(value.getTime() / 1000) * 1000;
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - instant;
+}
+
+function nextVoteResetAt(value = new Date()) {
+  const parts = zonedParts(value);
+  const nextLocalMidnight = Date.UTC(parts.year, parts.month - 1, parts.day + 1);
+  const firstGuess = new Date(nextLocalMidnight - timeZoneOffsetMs(value));
+  return new Date(nextLocalMidnight - timeZoneOffsetMs(firstGuess));
+}
 const AUTO_PROFILE_BLOCKLIST = new Set([
   'all-gas-no-brakes', 'annoying-orange', 'atrioc', 'samarjit-lankesh', 'amp-streamer-collective',
   'india-pakistan-relations', 'india-pakistan-war-of-1971', 'albania', 'american-samoa', 'toronto',
@@ -810,13 +856,13 @@ export class PersistentStore {
     const person = this.state.people.find((item) => !item.archivedAt && (item.id === personId || item.slug === personId));
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
 
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const currentDay = calendarDay(new Date());
     const recentVote = this.state.personVotes.find((vote) =>
-      vote.personId === person.id && vote.identityKey === identityKey && new Date(vote.createdAt).getTime() > cutoff,
+      vote.personId === person.id && vote.identityKey === identityKey && calendarDay(vote.createdAt) === currentDay,
     );
     if (recentVote) {
-      const retryAt = new Date(new Date(recentVote.createdAt).getTime() + 24 * 60 * 60 * 1000).toISOString();
-      throw new StoreError('VOTE_COOLDOWN', `You can vote for ${person.name} again after 24 hours.`, 429, retryAt);
+      const retryAt = nextVoteResetAt().toISOString();
+      throw new StoreError('VOTE_COOLDOWN', `You can vote for ${person.name} again after midnight.`, 429, retryAt);
     }
 
     const now = nowIso();
@@ -830,6 +876,10 @@ export class PersistentStore {
     await this.audit('person_vote', undefined, { personId: person.id });
     await this.persist();
     return clone(this.getPerson(person.id));
+  }
+
+  getNextPersonVoteAt() {
+    return nextVoteResetAt().toISOString();
   }
 
   async sharePerson(personId: string) {
