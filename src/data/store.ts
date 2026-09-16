@@ -65,7 +65,7 @@ export class MatchStore {
   private static initialized = false;
   private static backendAvailable = false;
   private static backendSyncPromise: Promise<boolean> | null = null;
-  private static realtimeTimer: number | null = null;
+
   private static remoteStats: SiteStats | null = null;
 
   static init() {
@@ -116,12 +116,6 @@ export class MatchStore {
       this.comments = INITIAL_COMMENTS;
     }
 
-    // Set up rapid, dynamic live simulated votes every 2.5s to keep the trading chart actively moving
-    if (typeof window !== 'undefined') {
-      this.realtimeTimer = window.setInterval(() => {
-        this.simulateRealtimeVotes();
-      }, 2500);
-    }
   }
 
   private static async backendRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -183,10 +177,6 @@ export class MatchStore {
           stats: SiteStats;
         }>('/api/matches');
         this.backendAvailable = true;
-        if (this.realtimeTimer !== null) {
-          window.clearInterval(this.realtimeTimer);
-          this.realtimeTimer = null;
-        }
         this.applyBackendSnapshot(snapshot);
         this.notify(false);
         return true;
@@ -463,82 +453,6 @@ export class MatchStore {
       match,
       deltaP,
     };
-  }
-
-  static simulateRealtimeVotes() {
-    let changed = false;
-    this.matches.forEach((m) => {
-      if (m.status === 'active' && new Date(m.startTime).getTime() <= Date.now() && new Date(m.endTime).getTime() > Date.now()) {
-        const rand = Math.random();
-        // 75% chance of live action every 2.5s
-        if (rand > 0.25) {
-          // Determine who gets the vote
-          const bias1 = m.votes1 / (m.votes1 + m.votes2 || 1);
-          const favorsCreator1 = Math.random() < bias1;
-          const creator = favorsCreator1 ? m.creator1 : m.creator2;
-
-          const voteAmount = Math.floor(Math.random() * 2) + 1;
-          if (favorsCreator1) {
-            m.votes1 += voteAmount;
-          } else {
-            m.votes2 += voteAmount;
-          }
-
-          const deltaSign = favorsCreator1 ? 1 : -1;
-          // Volatile trading jump: 0.7% to 2.2% swing with occasional retracements
-          const isPullback = Math.random() < 0.22; // 22% chance of natural market pullback
-          const effectiveSign = isPullback ? -deltaSign : deltaSign;
-          const deltaMagnitude = +(0.65 + Math.random() * 1.25).toFixed(2);
-          const deltaP = effectiveSign * deltaMagnitude;
-
-          const lastPoint = m.historyPoints[m.historyPoints.length - 1];
-          if (lastPoint) {
-            let nextP1 = Math.min(88, Math.max(12, Number((lastPoint.p1 + deltaP).toFixed(2))));
-            let nextP2 = Number((100 - nextP1).toFixed(2));
-
-            const now = new Date();
-            const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-            const lastTime = new Date(lastPoint.timestamp).getTime();
-            if (Date.now() - lastTime < 3000) {
-              lastPoint.p1 = nextP1;
-              lastPoint.p2 = nextP2;
-              lastPoint.timeLabel = timeLabel;
-            } else {
-              m.historyPoints.push({
-                timestamp: now.toISOString(),
-                timeLabel,
-                p1: nextP1,
-                p2: nextP2,
-              });
-              if (m.historyPoints.length > 16) {
-                m.historyPoints.shift();
-              }
-            }
-          }
-
-          // Record live event
-          this.recentVoteEvents.unshift({
-            id: 'evt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-            matchId: m.id,
-            creatorId: creator.id,
-            creatorName: creator.name,
-            location: getRandomCity(),
-            deltaP: Math.abs(deltaP),
-            timestamp: Date.now(),
-          });
-          if (this.recentVoteEvents.length > 25) {
-            this.recentVoteEvents.pop();
-          }
-
-          changed = true;
-        }
-      }
-    });
-
-    if (changed) {
-      this.notify();
-    }
   }
 
   static getComments(matchId: string): Comment[] {
