@@ -235,3 +235,247 @@ body[data-seo-layout="directory"] main section:first-of-type {
     font-size: 16px;
   }
 }
+
+/* Premium surface system: keep the same information architecture, but give
+   each theme its own deliberate depth instead of inverting dark colors. */
+:root {
+  --page: #f3f7fb;
+  --surface: #ffffff;
+  --surface-raised: #f8fbff;
+  --surface-muted: #edf4f9;
+  --line: #d8e4ee;
+  --ink: #10213a;
+  --muted: #5d6f85;
+  --brand: #087ea4;
+  --brand-soft: #e0f5fb;
+  --positive: #087f5b;
+  --warning: #b45309;
+}
+
+html[data-theme='dark'] {
+  --page: #070a13;
+  --surface: #0b1221;
+  --surface-raised: #101a2d;
+  --surface-muted: #111b2c;
+  --line: #243247;
+  --ink: #f8fafc;
+  --muted: #94a3b8;
+  --brand: #38bdf8;
+  --brand-soft: rgba(56, 189, 248, 0.12);
+  --positive: #34d399;
+  --warning: #fbbf24;
+}
+
+body {
+  background-color: var(--page);
+  color: var(--ink);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+html[data-theme='light'] body {
+  background-image:
+    radial-gradient(circle at 8% -8%, rgba(14, 165, 233, 0.13), transparent 30rem),
+    radial-gradient(circle at 92% 8%, rgba(245, 158, 11, 0.08), transparent 24rem);
+}
+
+html[data-theme='dark'] body {
+  background-image:
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.08), transparent 28rem),
+    radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.05), transparent 22rem);
+}
+
+html[data-theme='light'] .people-dashboard {
+  background: transparent !important;
+  color: var(--ink) !important;
+}
+
+html[data-theme='light'] .people-dashboard > header {
+  background: rgba(255, 255, 255, 0.84) !important;
+  border-color: var(--line) !important;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03), 0 14px 35px rgba(59, 130, 246, 0.06);
+}
+
+html[data-theme='light'] .people-dashboard main > section:first-of-type {
+  border-color: #b9e5f2 !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.18), transparent 19rem),
+    linear-gradient(135deg, #ffffff 0%, #f4fbff 58%, #e8f7fb 100%) !important;
+  box-shadow: 0 24px 70px rgba(14, 116, 144, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme='light'] .people-dashboard main > section:nth-of-type(2) {
+  border-color: #f2d58e !important;
+  background: linear-gradient(135deg, #fffdf5 0%, #ffffff 52%, #f0f8ff 100%) !important;
+  box-shadow: 0 18px 48px rgba(180, 83, 9, 0.08);
+}
+
+html[data-theme='light'] .people-dashboard .person-card {
+  border-color: var(--line) !important;
+  background: linear-gradient(155deg, #ffffff 0%, #fbfdff 100%) !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07), 0 2px 5px rgba(15, 23, 42, 0.04) !important;
+}
+
+html[data-theme='light'] .people-dashboard .person-card:hover {
+  border-color: #8bd7ea !important;
+  box-shadow: 0 22px 46px rgba(14, 116, 144, 0.14), 0 4px 10px rgba(15, 23, 42, 0.05) !important;
+}
+
+html[data-theme='light'] main[class*='bg-[#060a13'] {
+  background: transparent !important;
+}
+
+html[data-theme='light'] main[class*='bg-[#060a13'] article,
+html[data-theme='light'] main[class*='bg-[#060a13'] section {
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.07) !important;
+}
+
+html[data-theme='light'] [class*='bg-[#0b1221'],
+html[data-theme='light'] [class*='bg-[#070d18'],
+html[data-theme='light'] [class*='bg-[#060b15'],
+html[data-theme='light'] [class*='bg-[#080e1b'] {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+}
+
+html[data-theme='light'] [class*='bg-[#060b17'] {
+  background: var(--surface-raised) !important;
+  border-color: var(--line) !important;
+}
+
+html[data-theme='light'] [class*='text-sky-200'],
+html[data-theme='light'] [class*='text-sky-300'] {
+  color: #05688a !important;
+}
+
+html[data-theme='light'] [class*='text-emerald-200'],
+html[data-theme='light'] [class*='text-emerald-300'] {
+  color: #087f5b !important;
+}
+
+html[data-theme='light'] [class*='text-amber-200'],
+html[data-theme='light'] [class*='text-amber-300'] {
+  color: #a14f08 !important;
+}
+
+html[data-theme='light'] [class*='text-violet-200'],
+html[data-theme='light'] [class*='text-violet-300'] {
+  color: #6d45b5 !important;
+}
+
+html[data-theme='light'] [class*='text-rose-200'],
+html[data-theme='light'] [class*='text-rose-300'] {
+  color: #c2415a !important;
+}
+
+html[data-theme='light'] [class*='border-sky-500'],
+html[data-theme='light'] [class*='border-emerald-500'],
+html[data-theme='light'] [class*='border-amber-400'],
+html[data-theme='light'] [class*='border-violet-400'] {
+  border-color: color-mix(in srgb, currentColor 28%, var(--line)) !important;
+}
+
+html[data-theme='light'] .theme-toggle {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: #8bd7ea !important;
+  color: #10213a !important;
+  box-shadow: 0 12px 30px rgba(14, 116, 144, 0.16) !important;
+}
+
+html[data-theme='dark'] .theme-toggle {
+  background: rgba(11, 18, 33, 0.92) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+}
+
+@media (max-width: 640px) {
+  html[data-theme='light'] .people-dashboard main > section:first-of-type {
+    box-shadow: 0 16px 38px rgba(14, 116, 144, 0.1);
+  }
+
+  html[data-theme='light'] .people-dashboard .person-card {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06) !important;
+  }
+
+  html[data-theme='light'] main[class*='bg-[#060a13'] article {
+    border-radius: 1.75rem !important;
+  }
+}
+
+html[data-theme='light'] .profile-page,
+html[data-theme='light'] .profile-page > div {
+  background: transparent !important;
+}
+
+html[data-theme='light'] .profile-hero {
+  border-color: #b9e5f2 !important;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(14, 165, 233, 0.16), transparent 20rem),
+    linear-gradient(145deg, #ffffff 0%, #f7fbff 58%, #edf8fb 100%) !important;
+  box-shadow: 0 28px 70px rgba(14, 116, 144, 0.12) !important;
+}
+
+html[data-theme='light'] .profile-hero img {
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+}
+
+html[data-theme='light'] .profile-stat-grid {
+  background: rgba(248, 251, 255, 0.82);
+}
+
+html[data-theme='light'] .market-dashboard {
+  border-color: #a7e1d0 !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.13), transparent 22rem),
+    linear-gradient(145deg, #ffffff 0%, #f5fcfa 58%, #eef9f6 100%) !important;
+  box-shadow: 0 24px 60px rgba(8, 127, 91, 0.1) !important;
+}
+
+html[data-theme='light'] .market-dashboard [class*='bg-[#060b15'] {
+  background: #f5fafc !important;
+  border-color: #c9dce7 !important;
+}
+
+html[data-theme='light'] .profile-about {
+  border-color: var(--line) !important;
+  background: linear-gradient(145deg, #ffffff, #f7fbff) !important;
+}
+
+html[data-theme='light'] footer {
+  border-color: var(--line) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  color: var(--muted) !important;
+}
+
+html[data-theme='light'] footer [class*='text-slate-300'] {
+  color: var(--ink) !important;
+}
+
+html[data-theme='light'] footer a:hover {
+  color: var(--brand) !important;
+}
+
+html[data-theme='light'] [class*='border-violet-400'][class*='rounded-[2rem]'] {
+  border-color: #d7c9f7 !important;
+  background: linear-gradient(145deg, #ffffff 0%, #fbf8ff 58%, #f3efff 100%) !important;
+  box-shadow: 0 24px 60px rgba(109, 69, 181, 0.1) !important;
+}
+
+html[data-theme='light'] [class*='border-amber-400'][class*='rounded-[2rem]'] {
+  border-color: #f2d58e !important;
+  background: linear-gradient(145deg, #ffffff 0%, #fffdf6 58%, #fff7df 100%) !important;
+  box-shadow: 0 24px 60px rgba(180, 83, 9, 0.1) !important;
+}
+
+html[data-theme='light'] body[data-seo-layout='policy'] main section:first-of-type {
+  border-color: #f2d58e !important;
+  background: linear-gradient(145deg, #ffffff 0%, #fffdf6 58%, #fff7df 100%) !important;
+}
+
+html[data-theme='light'] body[data-seo-layout='guide'] main section:first-of-type {
+  border-color: #d7c9f7 !important;
+  background: linear-gradient(145deg, #ffffff 0%, #fbf8ff 58%, #f3efff 100%) !important;
+}
+
+html[data-theme='light'] body[data-seo-layout='directory'] main section:first-of-type {
+  border-color: #a7e1d0 !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f5fcfa 58%, #eef9f6 100%) !important;
+}
