@@ -53,7 +53,7 @@ export const SiteFooter: React.FC = () => (
       </div>
       <div className="mt-10 flex flex-col gap-2 border-t border-slate-800/80 pt-5 text-[11px] sm:flex-row sm:items-center sm:justify-between">
         <span className="font-black tracking-wide text-slate-300">1v1Vote</span>
-        <span>Public opinion, ranked live. One vote per profile every 24 hours.</span>
+         <span>Public opinion, ranked live. One vote per profile per calendar day.</span>
       </div>
     </div>
   </footer>

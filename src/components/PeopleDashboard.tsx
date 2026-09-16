@@ -6,7 +6,7 @@ import { SiteFooter } from './SiteFooter';
 import { LiveMarketBoard } from './LiveMarketBoard';
 import { trackEvent } from '../seo';
 
-const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v1';
+const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v2';
 const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const countries: Array<'All' | PersonCountry> = ['All', 'Pakistan', 'India', 'USA', 'Global'];
 
@@ -106,7 +106,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
       <div className="relative mt-4 grid grid-cols-[1fr_auto] gap-2">
         <button type="button" onClick={() => onVote(person)} disabled={isCoolingDown} className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black transition ${isCoolingDown ? 'cursor-not-allowed border border-slate-700 bg-slate-900 text-slate-500' : 'bg-sky-500 text-slate-950 hover:bg-sky-300 active:scale-[0.98]'}`}>
           {isCoolingDown ? <Clock3 className="h-4 w-4" /> : <Vote className="h-4 w-4" />}
-          {isCoolingDown ? `Again in ${remainingLabel(cooldown!)}` : 'Vote for this person'}
+          {isCoolingDown ? `After midnight · ${remainingLabel(cooldown!)}` : 'Vote for this person'}
         </button>
         <button type="button" onClick={() => onShare(person)} aria-label={`Share ${person.name}`} className="flex min-h-11 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300 transition hover:border-sky-400 hover:text-sky-300">
           <Share2 className="h-4 w-4" />
@@ -184,7 +184,7 @@ export const PeopleDashboard: React.FC = () => {
         setPeople((current) => sortPeople(current.map((item) => item.id === payload.person!.id ? payload.person! : item)));
         trackEvent('vote_submitted', { profile_category: person.category, profile_country: person.country });
       }
-      showToast(`Vote registered for ${person.name}. You can vote for this profile again in 24 hours.`);
+      showToast(`Vote registered for ${person.name}. You can vote for this profile again after midnight.`);
     } catch {
       showToast('The live voting service is temporarily unavailable.');
     }
@@ -236,9 +236,9 @@ export const PeopleDashboard: React.FC = () => {
         <section className="relative overflow-hidden rounded-[2rem] border border-sky-500/20 bg-gradient-to-br from-[#0d1b36] via-[#0a1223] to-[#0a0e19] px-5 py-8 shadow-2xl shadow-sky-950/20 sm:px-10 sm:py-11">
           <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
           <div className="relative max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> One person, one vote every 24 hours</div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> One person, one vote each calendar day</div>
             <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">The public pulse, ranked live.</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">Discover notable people, read their source-backed profiles, and cast one vote every 24 hours. The ranking stays simple: real people, live support, clear sources.</p>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">Discover notable people, read their source-backed profiles, and cast one vote each calendar day. Voting opens again after midnight.</p>
           </div>
           <div className="relative mt-7 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-slate-800/80 pt-5 sm:max-w-2xl sm:grid-cols-4 sm:gap-8">
             <div><div className="text-xl font-black text-white">{formatCount(people.length)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Profiles</div></div>
@@ -267,7 +267,7 @@ export const PeopleDashboard: React.FC = () => {
 
         {loading ? <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-64 animate-pulse rounded-3xl border border-slate-800 bg-[#0b1221]" />)}</div> : visiblePeople.length ? <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visiblePeople.map((person) => <PersonCard key={person.id} person={person} rank={people.findIndex((item) => item.id === person.id) + 1} cooldown={cooldowns[person.id]} onVote={handleVote} onShare={handleShare} />)}</div> : <div className="mt-3 rounded-3xl border border-dashed border-slate-800 px-5 py-14 text-center text-sm text-slate-500">No profiles match this search or filter.</div>}
 
-        <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/80 bg-[#0b1221]/70 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-sky-400" /> No account required. Vote once for each profile every 24 hours.</div><div className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Share any profile with its link.</div></div>
+         <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/80 bg-[#0b1221]/70 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-sky-400" /> No account required. Vote once for each profile per calendar day.</div><div className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Share any profile with its link.</div></div>
       </main>
       <SiteFooter />
     </div>

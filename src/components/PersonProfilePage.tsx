@@ -37,7 +37,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
     if (!person) return;
     const response = await fetch(`/api/people/${encodeURIComponent(person.id)}/vote`, { method: 'POST' });
     const payload = await response.json() as { person?: Person; error?: string };
-    setMessage(response.ok ? `Vote registered for ${person.name}. You can vote again in 24 hours.` : payload.error || 'Vote could not be registered.');
+    setMessage(response.ok ? `Vote registered for ${person.name}. You can vote again after midnight.` : payload.error || 'Vote could not be registered.');
     if (payload.person) setPerson(payload.person);
   };
 
