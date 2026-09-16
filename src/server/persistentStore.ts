@@ -7,6 +7,7 @@ import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedD
 import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from '../data/matchPricing';
 import { buildPersonMarket } from '../data/personMarket';
 import { scrapeSocialProfile } from './socialScraper';
+import { fetchRemoteImage, resolveImageSourceUrl } from './imageService';
 
 type Role = 'user' | 'admin';
 
@@ -201,18 +202,11 @@ async function fetchPublicProfileSummary(url: string) {
 
 async function isUsableImage(url: string | undefined) {
   if (!url || !/^https:\/\//i.test(url)) return false;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { Range: 'bytes=0-1024', 'User-Agent': '1v1Vote profile research bot/1.0' },
-    });
-    return response.ok && (response.headers.get('content-type') || '').toLowerCase().startsWith('image/');
+    await fetchRemoteImage(url, 960);
+    return true;
   } catch {
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -763,16 +757,22 @@ export class PersistentStore {
     return clone(request);
   }
 
-  private personInput(input: Partial<Person>, existing?: Person): Person {
+  private async personInput(input: Partial<Person>, existing?: Person): Promise<Person> {
     const name = String(input.name ?? existing?.name ?? '').trim().slice(0, 80);
     const slug = profileSlug(String(input.slug ?? name));
-    const avatar = String(input.avatar ?? existing?.avatar ?? '').trim();
+    const avatarInput = String(input.avatar ?? existing?.avatar ?? '').trim();
     const profileUrl = String(input.profileUrl ?? existing?.profileUrl ?? '').trim() || undefined;
     const researchUrl = String(input.researchUrl ?? existing?.researchUrl ?? profileUrl ?? '').trim() || undefined;
     const category = String(input.category ?? existing?.category ?? 'Public Figure') as PersonCategory;
     const country = String(input.country ?? existing?.country ?? 'Global') as PersonCountry;
     if (name.length < 2 || !slug) throw new StoreError('INVALID_PERSON', 'A profile name is required.');
-    if (!/^https:\/\//i.test(avatar) || isPlaceholderAvatar(avatar)) throw new StoreError('INVALID_PERSON_IMAGE', 'A real HTTPS image URL is required.');
+    if (!/^https:\/\//i.test(avatarInput)) throw new StoreError('INVALID_PERSON_IMAGE', 'A public HTTPS image URL is required.');
+    let avatar: string;
+    try {
+      avatar = await resolveImageSourceUrl(avatarInput);
+    } catch {
+      throw new StoreError('INVALID_PERSON_IMAGE', 'That URL did not resolve to a public image. Paste a direct image URL or a public profile/page URL containing an image.');
+    }
     if (profileUrl && !/^https:\/\//i.test(profileUrl)) throw new StoreError('INVALID_PROFILE_URL', 'The source profile URL must use HTTPS.');
     if (researchUrl && !/^https:\/\//i.test(researchUrl)) throw new StoreError('INVALID_RESEARCH_URL', 'The research URL must use HTTPS.');
     if (!PERSON_CATEGORIES.includes(category)) throw new StoreError('INVALID_PERSON_CATEGORY', 'Choose a valid profile category.');
@@ -808,7 +808,7 @@ export class PersistentStore {
   }
 
   async createPerson(input: Partial<Person>, actorId = 'admin') {
-    const person = this.personInput(input);
+    const person = await this.personInput(input);
     person.market = person.market || buildPersonMarket(person);
     if (this.state.people.some((item) => item.slug === person.slug || item.name.toLowerCase() === person.name.toLowerCase())) {
       throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
@@ -822,7 +822,7 @@ export class PersistentStore {
   async updatePerson(idOrSlug: string, input: Partial<Person>, actorId = 'admin') {
     const person = this.state.people.find((item) => item.id === idOrSlug || item.slug === idOrSlug);
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
-    const updated = this.personInput(input, person);
+    const updated = await this.personInput(input, person);
     if (this.state.people.some((item) => item.id !== person.id && (item.slug === updated.slug || item.name.toLowerCase() === updated.name.toLowerCase()))) {
       throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
     }
