@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 import { scrapeSocialProfile } from './src/server/socialScraper';
 import { PersistentStore, StoreError } from './src/server/persistentStore';
+import { fetchRemoteImage, ImageFetchError } from './src/server/imageService';
 import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from './src/data/matchPricing';
 
 const ADMIN_COOKIE = 'v1_admin_session';
@@ -188,17 +189,17 @@ async function startServer() {
     return Boolean(referer && (referer === siteOrigin() || referer.startsWith(`${siteOrigin()}/`)));
   };
 
-  app.use('/api/people', (req, res, next) => {
-    if (req.method === 'GET') {
-      res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
-    }
-    return next();
-  });
-
   app.use('/api/admin', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isTrustedMutation(req)) {
       return res.status(403).json({ error: 'A same-origin request is required.' });
+    }
+    return next();
+  });
+
+  app.use('/api/people', (req, res, next) => {
+    if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
     }
     return next();
   });
@@ -226,6 +227,23 @@ async function startServer() {
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: '1v1Vote', database: 'ready', timestamp: new Date().toISOString() });
+  });
+
+  app.get('/api/image', async (req, res) => {
+    const source = typeof req.query.url === 'string' ? req.query.url : '';
+    if (!source) return res.status(400).json({ error: 'An image URL is required.' });
+    try {
+      const width = typeof req.query.width === 'string' ? Number(req.query.width) : 960;
+      const image = await fetchRemoteImage(source, Number.isFinite(width) ? width : 960);
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      res.setHeader('Content-Type', image.contentType);
+      res.setHeader('Content-Length', image.body.length);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.end(image.body);
+    } catch (error) {
+      if (!(error instanceof ImageFetchError)) console.error(error);
+      return res.status(404).json({ error: 'The image could not be loaded from that URL.' });
+    }
   });
 
   app.get('/api/people', (_req, res) => {
