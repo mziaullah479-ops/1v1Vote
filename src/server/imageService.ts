@@ -41,6 +41,13 @@ function requestUrl(input: string, width: number) {
   const size = Math.min(1600, Math.max(96, Math.round(width || 960)));
   if (url.hostname === 'upload.wikimedia.org' || url.hostname === 'thumb.wikimedia.org') {
     url.hostname = 'upload.wikimedia.org';
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts[0] === 'wikipedia' && parts[1] === 'commons' && parts[2] === 'thumb' && parts.length >= 6) {
+      const file = parts[parts.length - 1].replace(/^\d+px-/i, '');
+      url.pathname = '/wikipedia/commons/' + parts.slice(3, -1).join('/');
+      if (!url.pathname.endsWith('/')) url.pathname += '/';
+      url.pathname += file;
+    }
     return 'https://images.weserv.nl/?url=' + encodeURIComponent(url.toString()) + '&w=' + size + '&output=webp';
   } else if (url.hostname.endsWith('googleusercontent.com')) {
     url.pathname = url.pathname.replace(/=s\d+/i, '=s' + size);
