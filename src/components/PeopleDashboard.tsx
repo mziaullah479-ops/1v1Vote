@@ -5,6 +5,7 @@ import { Person, PersonCategory, PersonCountry } from '../types';
 import { SiteFooter } from './SiteFooter';
 import { LiveMarketBoard } from './LiveMarketBoard';
 import { trackEvent } from '../seo';
+import { imageVariant } from '../utils/imageUrl';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v2';
 const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Creator', 'Sports', 'Entertainment', 'Business'];
@@ -70,7 +71,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
             #{rank}
           </div>
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
-            {!imageError && <img src={person.avatar} alt={person.name} width={56} height={56} loading="lazy" decoding="async" className="relative z-10 h-full w-full object-cover" onError={() => setImageError(true)} />}
+            {!imageError && <img src={imageVariant(person.avatar, 240)} alt={person.name} width={56} height={56} loading="lazy" decoding="async" sizes="56px" className="relative z-10 h-full w-full object-cover" onError={() => setImageError(true)} />}
             <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-sky-300">{personInitials(person.name)}</span>
           </div>
           <div className="min-w-0">
@@ -248,7 +249,7 @@ export const PeopleDashboard: React.FC = () => {
           </div>
         </section>
 
-         {people.length > 0 && <section className="mt-5 overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-r from-[#151125] via-[#0b1221] to-[#101b2b] p-4 shadow-xl sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300"><Sparkles className="h-3.5 w-3.5" /> Live signal</div><h2 className="mt-1 text-lg font-black text-white">Who leads the public pulse today?</h2></div><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Organic votes</span></div><div className="mt-4 grid gap-3 md:grid-cols-3">{people.slice(0, 3).map((person, index) => <a key={person.id} href={`/people/${encodeURIComponent(person.slug)}`} className={`group flex items-center gap-3 rounded-2xl border p-3 transition hover:-translate-y-0.5 ${index === 0 ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-[#080e1b]/70'}`}><span className="text-lg font-black text-amber-300">0{index + 1}</span><img src={person.avatar} alt="" width={42} height={42} loading="lazy" className="h-10 w-10 rounded-xl object-cover" /><span className="min-w-0"><span className="block truncate text-sm font-black text-white group-hover:text-sky-300">{person.name}</span><span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatCount(person.votes)} votes · {person.country}</span></span></a>)}</div></section>}
+         {people.length > 0 && <section className="mt-5 overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-r from-[#151125] via-[#0b1221] to-[#101b2b] p-4 shadow-xl sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300"><Sparkles className="h-3.5 w-3.5" /> Live signal</div><h2 className="mt-1 text-lg font-black text-white">Who leads the public pulse today?</h2></div><span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Organic votes</span></div><div className="mt-4 grid gap-3 md:grid-cols-3">{people.slice(0, 3).map((person, index) => <a key={person.id} href={`/people/${encodeURIComponent(person.slug)}`} className={`group flex items-center gap-3 rounded-2xl border p-3 transition hover:-translate-y-0.5 ${index === 0 ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-[#080e1b]/70'}`}><span className="text-lg font-black text-amber-300">0{index + 1}</span><img src={imageVariant(person.avatar, 240)} alt="" width={42} height={42} loading="lazy" decoding="async" sizes="42px" className="h-10 w-10 rounded-xl object-cover" /><span className="min-w-0"><span className="block truncate text-sm font-black text-white group-hover:text-sky-300">{person.name}</span><span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatCount(person.votes)} votes · {person.country}</span></span></a>)}</div></section>}
          <LiveMarketBoard people={people} />
 
         <section className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
