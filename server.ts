@@ -188,6 +188,13 @@ async function startServer() {
     return Boolean(referer && (referer === siteOrigin() || referer.startsWith(`${siteOrigin()}/`)));
   };
 
+  app.use('/api/people', (req, res, next) => {
+    if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    }
+    return next();
+  });
+
   app.use('/api/admin', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isTrustedMutation(req)) {
