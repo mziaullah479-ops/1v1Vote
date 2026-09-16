@@ -98,7 +98,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/request': 'Request a correction or profile review for the 1v1Vote directory.',
     '/promote': 'Request a transparent paid promotion for an active 1v1Vote public profile.',
     '/ai': 'A machine-readable guide to 1v1Vote profiles, voting, rankings, promotions, and public sources.',
-    '/vote': 'Support public figures you follow and help shape the live 1v1Vote ranking. Vote once every 24 hours with no account required.',
+    '/vote': 'Support public figures you follow and help shape the live 1v1Vote ranking. Vote once per calendar day with no account required.',
     '/vote-guide': 'A clear guide to voting, cooldowns, rankings, and profile pages.',
     '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
   };
@@ -119,7 +119,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
       ? descriptionOverrides[pathname]
       : staticTitles[pathname]
         ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
-      : 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once every 24 hours.';
+      : 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once per calendar day.';
 
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
@@ -248,7 +248,7 @@ async function startServer() {
     try {
       const { identityKey } = getIdentity(req, res);
       const person = await store.voteForPerson(req.params.personId, identityKey);
-      return res.json({ person, nextVoteAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() });
+      return res.json({ person, nextVoteAt: store.getNextPersonVoteAt() });
     } catch (error) {
       return errorResponse(res, error);
     }
@@ -653,7 +653,7 @@ async function startServer() {
     res.type('text/plain').send([
       '# 1v1Vote',
       '1v1Vote is a public-opinion directory and daily voting index for notable people.',
-      'Public rules: one organic vote per profile every 24 hours; ranking is organic votes, then shares, then name.',
+      'Public rules: one organic vote per profile per calendar day; the reset happens at midnight Asia/Karachi time. Ranking is organic votes, then shares, then name.',
       'Paid promotions are time-limited sponsored visibility placements and never change votes or rankings.',
       'Use /people for profiles, /ai for the plain-language guide, /ai-context.json for machine-readable data, and /sitemap.xml for public URLs.',
     ].join('\n'));
