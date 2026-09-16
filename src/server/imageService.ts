@@ -41,16 +41,7 @@ function requestUrl(input: string, width: number) {
   const size = Math.min(1600, Math.max(96, Math.round(width || 960)));
   if (url.hostname === 'upload.wikimedia.org' || url.hostname === 'thumb.wikimedia.org') {
     url.hostname = 'upload.wikimedia.org';
-    const parts = url.pathname.split('/').filter(Boolean);
-    if (parts[0] === 'wikipedia' && parts[1] === 'commons' && parts.length >= 4) {
-      const thumb = parts[2] === 'thumb';
-      const file = parts[parts.length - 1];
-      const folders = thumb ? parts.slice(3, -1) : parts.slice(2, -1);
-      const name = thumb ? file.replace(/^\d+px-/i, '') : file;
-      const folderPath = thumb ? folders.join('/') : folders.join('/') + '/' + name;
-      url.pathname = '/wikipedia/commons/thumb/' + folderPath + '/' + size + 'px-' + name;
-      return 'https://images.weserv.nl/?url=' + encodeURIComponent(url.toString()) + '&w=' + size + '&output=webp';
-    }
+    return 'https://images.weserv.nl/?url=' + encodeURIComponent(url.toString()) + '&w=' + size + '&output=webp';
   } else if (url.hostname.endsWith('googleusercontent.com')) {
     url.pathname = url.pathname.replace(/=s\d+/i, '=s' + size);
     url.search = url.search.replace(/=s\d+/i, '=s' + size);
