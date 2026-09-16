@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, Megaphone, Share2, Vote } from 'lucide-react';
 import { Person } from '../types';
 import { setPageSeo } from '../seo';
+import { imageVariant } from '../utils/imageUrl';
 import { PersonMarketDashboard } from './PersonMarketDashboard';
 
 function formatCount(value: number) {
@@ -56,7 +57,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
       <a href="/" className="inline-flex items-center gap-2 text-xs font-bold text-sky-300 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to live rankings</a>
       <article className="profile-hero mt-8 overflow-hidden rounded-[2rem] border border-sky-500/20 bg-gradient-to-br from-[#0d1b36] to-[#0a0e19] shadow-2xl">
         <div className="grid gap-8 p-6 sm:grid-cols-[220px_1fr] sm:p-10">
-          <div className="mx-auto h-48 w-48 overflow-hidden rounded-[2rem] border border-sky-400/40 bg-slate-900 shadow-xl sm:mx-0 sm:h-56 sm:w-56"><img src={person.avatar} alt={person.name} width={224} height={224} decoding="async" className="h-full w-full object-cover" /></div>
+          <div className="mx-auto h-48 w-48 overflow-hidden rounded-[2rem] border border-sky-400/40 bg-slate-900 shadow-xl sm:mx-0 sm:h-56 sm:w-56"><img src={imageVariant(person.avatar, 480)} alt={person.name} width={224} height={224} decoding="async" sizes="(min-width: 640px) 224px, 192px" className="h-full w-full object-cover" /></div>
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-sky-300"><span>Rank #{rank || '—'}</span><span>•</span><span>{person.category}</span>{person.verified && <Check className="h-4 w-4 text-emerald-300" />}</div>
             {person.promotion && <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-400/35 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-200"><Megaphone className="h-3.5 w-3.5" /> {person.promotion.label}</div>}
