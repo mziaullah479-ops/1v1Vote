@@ -1,4 +1,5 @@
 import { Platform } from '../types';
+import { apiUrl } from '../services/api';
 
 export interface DetectedSocialProfile {
   platform: Platform;
@@ -95,7 +96,7 @@ export async function fetchSocialProfile(
   if (!url.trim()) return syncFallback;
 
   try {
-    const res = await fetch(`/api/detect-social?url=${encodeURIComponent(url)}&name=${encodeURIComponent(creatorNameHint || '')}`);
+    const res = await fetch(apiUrl(`/api/detect-social?url=${encodeURIComponent(url)}&name=${encodeURIComponent(creatorNameHint || '')}`));
     if (!res.ok) {
       console.warn('API returned non-ok status for social detection:', res.status);
       return syncFallback;
