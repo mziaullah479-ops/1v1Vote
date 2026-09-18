@@ -5,9 +5,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
-import { PersistentStore, StoreError } from './src/server/persistentStore';
+import { PersistentStore, StoreError } from './src/server/persistentstore';
 import { fetchRemoteImage, ImageFetchError, type RemoteImage } from './src/server/imageService';
-import { MATCH_REQUEST_PLANS } from './src/data/matchPricing';
+import { MATCH_REQUEST_PLANS } from './src/data/matchpricing';
 
 const ADMIN_COOKIE = 'v1_admin_session';
 const ADMIN_CSRF_COOKIE = 'v1_admin_csrf';
