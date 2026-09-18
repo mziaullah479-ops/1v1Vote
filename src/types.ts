@@ -2,25 +2,10 @@ export type Platform = 'YouTube' | 'TikTok' | 'Instagram' | 'Twitch';
 export type Region = 'Pakistan' | 'India' | 'USA' | 'Global';
 export type MatchRequestStatus = 'pending' | 'approved' | 'rejected';
 export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
-export type PromotionRequestStatus = 'pending' | 'approved' | 'rejected';
 export type PersonCategory = 'Public Figure' | 'Religious Scholar' | 'Politics' | 'Creator' | 'Sports' | 'Entertainment' | 'Business';
 export type PersonCountry = 'Pakistan' | 'India' | 'USA' | 'Global';
-export type PeopleAutomationState = 'idle' | 'running' | 'active' | 'source-refresh' | 'error';
 export type MarketPeriod = '1D' | '1W' | '1M' | '1Y' | '5Y';
 export type MarketTrend = 'up' | 'down' | 'flat';
-
-export interface PeopleAutomationStatus {
-  enabled: boolean;
-  state: PeopleAutomationState;
-  provider: string;
-  lastRunAt?: string;
-  lastRefreshed: number;
-  lastPublished: number;
-  discoveryVersion?: number;
-  lastError?: string;
-  nextRunAt?: string;
-  paused?: boolean;
-}
 
 export interface Person {
   id: string;
@@ -39,30 +24,9 @@ export interface Person {
   subscriberCountRaw?: number;
   votes: number;
   shares: number;
-  views?: number;
-  viewHistory?: PersonViewPoint[];
-  supportCredits?: number;
-  socialGrowth24h?: number;
-  socialLastCheckedAt?: string;
   updatedAt: string;
-  lastResearchedAt?: string;
   archivedAt?: string;
-  promotion?: PersonPromotion;
   market?: PersonMarket;
-}
-
-export interface PersonViewPoint {
-  date: string;
-  views: number;
-}
-
-export interface SupportCreditAdjustment {
-  id: string;
-  personId: string;
-  delta: number;
-  reason: string;
-  actorId: string;
-  createdAt: string;
 }
 
 export interface PersonMarketPoint {
@@ -86,39 +50,6 @@ export interface PersonMarket {
   dataMode: 'public-signal-model';
   lastUpdatedAt: string;
   sources: string[];
-}
-
-export interface PersonPromotion {
-  id: string;
-  personId: string;
-  label: string;
-  reason?: string;
-  startsAt: string;
-  endsAt: string;
-  createdBy: string;
-  createdAt: string;
-  revokedAt?: string;
-}
-
-export interface PromotionRequest {
-  id: string;
-  personId: string;
-  personName: string;
-  requesterName: string;
-  requesterEmail: string;
-  createdAt: string;
-  status: PromotionRequestStatus;
-  paymentStatus: PaymentStatus;
-  paymentReference: string;
-  paymentAmountPkr: number;
-  durationHours: number;
-  startsAt: string;
-  endsAt: string;
-  label: string;
-  reason?: string;
-  adminNote?: string;
-  reviewedAt?: string;
-  promotionId?: string;
 }
 
 export interface Creator {
