@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Archive, CheckCircle, Clock3, DatabaseBackup, Edit3, Image, LockKeyhole, Megaphone, Pause, Play, RefreshCw, RotateCcw, Save, ShieldCheck, X } from 'lucide-react';
 import { Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion } from '../types';
+import { apiUrl } from '../services/api';
+
+const fetch = (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(typeof input === 'string' && input.startsWith('/api/') ? apiUrl(input) : input, init);
 
 const categories: PersonCategory[] = ['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const countries: PersonCountry[] = ['Pakistan', 'India', 'USA', 'Global'];
@@ -24,22 +27,22 @@ export const PeopleAdminPanel: React.FC = () => {
   const [busy, setBusy] = useState(false);
 
   const loadPeople = async () => {
-    const response = await fetch('/api/admin/people', { credentials: 'include', cache: 'no-store' });
+    const response = await fetch(apiUrl('/api/admin/people'), { credentials: 'include', cache: 'no-store' });
     if (response.ok) setPeople((await response.json()).people || []);
   };
 
   const loadAutomation = async () => {
-    const response = await fetch('/api/admin/people/automation', { credentials: 'include', cache: 'no-store' });
+    const response = await fetch(apiUrl('/api/admin/people/automation'), { credentials: 'include', cache: 'no-store' });
     if (response.ok) setAutomation((await response.json()).automation || null);
   };
 
   const loadPromotions = async () => {
-    const response = await fetch('/api/admin/promotions', { credentials: 'include', cache: 'no-store' });
+    const response = await fetch(apiUrl('/api/admin/promotions'), { credentials: 'include', cache: 'no-store' });
     if (response.ok) setPromotions((await response.json()).promotions || []);
   };
 
   useEffect(() => {
-    fetch('/api/admin/session', { credentials: 'include' })
+    fetch(apiUrl('/api/admin/session'), { credentials: 'include' })
       .then((response) => response.json())
       .then((data) => {
         const loggedIn = Boolean(data.authenticated);
@@ -60,7 +63,7 @@ export const PeopleAdminPanel: React.FC = () => {
     event.preventDefault();
     setBusy(true);
     setMessage('');
-    const response = await fetch('/api/admin/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+    const response = await fetch(apiUrl('/api/admin/login'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     if (!response.ok) return setMessage(data.error || 'Unable to sign in.');
@@ -72,7 +75,7 @@ export const PeopleAdminPanel: React.FC = () => {
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch(editingId ? `/api/admin/people/${encodeURIComponent(editingId)}` : '/api/admin/people', { method: editingId ? 'PUT' : 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+    const response = await fetch(apiUrl(editingId ? `/api/admin/people/${encodeURIComponent(editingId)}` : '/api/admin/people'), { method: editingId ? 'PUT' : 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setMessage(response.ok ? (editingId ? 'Profile updated safely. The image URL was verified and is live.' : 'Profile added safely. The image URL was verified and is live.') : data.error || 'Could not save this profile.');
@@ -82,7 +85,7 @@ export const PeopleAdminPanel: React.FC = () => {
   const createPromotion = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch('/api/admin/promotions', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ personId: promotionForm.personId, label: promotionForm.label, reason: promotionForm.reason, endsAt: new Date(Date.now() + Number(promotionForm.hours) * 60 * 60 * 1000).toISOString() }) });
+    const response = await fetch(apiUrl('/api/admin/promotions'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ personId: promotionForm.personId, label: promotionForm.label, reason: promotionForm.reason, endsAt: new Date(Date.now() + Number(promotionForm.hours) * 60 * 60 * 1000).toISOString() }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setMessage(response.ok ? 'Featured placement started. Organic votes were not changed.' : data.error || 'Could not start promotion.');
@@ -90,27 +93,27 @@ export const PeopleAdminPanel: React.FC = () => {
   };
 
   const revokePromotion = async (promotion: PersonPromotion) => {
-    const response = await fetch(`/api/admin/promotions/${encodeURIComponent(promotion.id)}`, { method: 'DELETE', credentials: 'include' });
+    const response = await fetch(apiUrl(`/api/admin/promotions/${encodeURIComponent(promotion.id)}`), { method: 'DELETE', credentials: 'include' });
     setMessage(response.ok ? 'Promotion ended. Organic votes were unchanged.' : 'Could not end promotion.');
     await loadPromotions();
   };
 
   const archive = async (person: Person) => {
     if (!window.confirm(`Archive ${person.name}? Votes and history stay safe.`)) return;
-    await fetch(`/api/admin/people/${encodeURIComponent(person.id)}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(apiUrl(`/api/admin/people/${encodeURIComponent(person.id)}`), { method: 'DELETE', credentials: 'include' });
     await loadPeople();
     setMessage(`${person.name} archived.`);
   };
 
   const restore = async (person: Person) => {
-    await fetch(`/api/admin/people/${encodeURIComponent(person.id)}/restore`, { method: 'POST', credentials: 'include' });
+    await fetch(apiUrl(`/api/admin/people/${encodeURIComponent(person.id)}/restore`), { method: 'POST', credentials: 'include' });
     await loadPeople();
     setMessage(`${person.name} restored.`);
   };
 
   const refresh = async () => {
     setBusy(true);
-    const response = await fetch('/api/admin/people/catalog', { method: 'POST', credentials: 'include' });
+    const response = await fetch(apiUrl('/api/admin/people/catalog'), { method: 'POST', credentials: 'include' });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setAutomation(data.automation || automation);
@@ -119,7 +122,7 @@ export const PeopleAdminPanel: React.FC = () => {
   };
 
   const backup = async () => {
-    const response = await fetch('/api/admin/backup', { method: 'POST', credentials: 'include' });
+    const response = await fetch(apiUrl('/api/admin/backup'), { method: 'POST', credentials: 'include' });
     const data = await response.json().catch(() => ({}));
     setMessage(response.ok ? `Backup created: ${data.backup}` : data.error || 'Backup failed.');
   };
@@ -127,7 +130,7 @@ export const PeopleAdminPanel: React.FC = () => {
   const toggleAutomation = async () => {
     if (!automation) return;
     setBusy(true);
-    const response = await fetch('/api/admin/people/automation', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused: !automation.paused }) });
+    const response = await fetch(apiUrl('/api/admin/people/automation'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused: !automation.paused }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setAutomation(data.automation || automation);

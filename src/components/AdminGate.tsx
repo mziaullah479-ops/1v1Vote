@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
 import { Match, MatchRequest } from '../types';
 import { AdminPanel } from './AdminPanel';
+import { apiUrl } from '../services/api';
 
 interface AdminGateProps {
   matches: Match[];
@@ -20,7 +21,7 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
   const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([]);
 
   useEffect(() => {
-    fetch('/api/admin/session', { credentials: 'include' })
+     fetch(apiUrl('/api/admin/session'), { credentials: 'include' })
       .then((response) => response.json())
       .then((data) => {
         setAuthenticated(Boolean(data.authenticated));
@@ -32,14 +33,14 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
 
   useEffect(() => {
     if (!authenticated) return;
-    fetch('/api/admin/match-requests', { credentials: 'include' })
+     fetch(apiUrl('/api/admin/match-requests'), { credentials: 'include' })
       .then((response) => response.ok ? response.json() : { requests: [] })
       .then((data) => setMatchRequests(data.requests || []))
       .catch(() => undefined);
   }, [authenticated]);
 
   const reviewMatchRequest = async (requestId: string, decision: 'approve' | 'reject', adminNote: string) => {
-    const response = await fetch(`/api/admin/match-requests/${encodeURIComponent(requestId)}/review`, {
+     const response = await fetch(apiUrl(`/api/admin/match-requests/${encodeURIComponent(requestId)}/review`), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -53,7 +54,7 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
   const login = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
-    const response = await fetch('/api/admin/login', {
+     const response = await fetch(apiUrl('/api/admin/login'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -69,7 +70,7 @@ export const AdminGate: React.FC<AdminGateProps> = ({ matches, onAddMatch, onEnd
   };
 
   const logout = async () => {
-    await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
+     await fetch(apiUrl('/api/admin/logout'), { method: 'POST', credentials: 'include' }).catch(() => undefined);
     onExit();
   };
 

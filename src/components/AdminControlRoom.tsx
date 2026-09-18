@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Archive, CheckCircle, Clock3, DatabaseBackup, LockKeyhole, Megaphone, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import { Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, PromotionRequest, SupportCreditAdjustment } from '../types';
+import { apiUrl } from '../services/api';
+
+const fetch = (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(typeof input === 'string' && input.startsWith('/api/') ? apiUrl(input) : input, init);
 
 const categories: PersonCategory[] = ['Public Figure', 'Religious Scholar', 'Politics', 'Creator', 'Sports', 'Entertainment', 'Business'];
 const countries: PersonCountry[] = ['Pakistan', 'India', 'USA', 'Global'];
@@ -28,11 +31,11 @@ export const AdminControlRoom: React.FC = () => {
 
   const load = async () => {
     const [peopleResponse, automationResponse, promotionResponse, requestResponse, supportResponse] = await Promise.all([
-      fetch('/api/admin/people', { credentials: 'include', cache: 'no-store' }),
-      fetch('/api/admin/people/automation', { credentials: 'include', cache: 'no-store' }),
-      fetch('/api/admin/promotions', { credentials: 'include', cache: 'no-store' }),
-      fetch('/api/admin/promotion-requests', { credentials: 'include', cache: 'no-store' }),
-      fetch('/api/admin/support-adjustments', { credentials: 'include', cache: 'no-store' }),
+       fetch(apiUrl('/api/admin/people'), { credentials: 'include', cache: 'no-store' }),
+       fetch(apiUrl('/api/admin/people/automation'), { credentials: 'include', cache: 'no-store' }),
+       fetch(apiUrl('/api/admin/promotions'), { credentials: 'include', cache: 'no-store' }),
+       fetch(apiUrl('/api/admin/promotion-requests'), { credentials: 'include', cache: 'no-store' }),
+       fetch(apiUrl('/api/admin/support-adjustments'), { credentials: 'include', cache: 'no-store' }),
     ]);
     if (peopleResponse.ok) setPeople((await peopleResponse.json()).people || []);
     if (automationResponse.ok) setAutomation((await automationResponse.json()).automation || null);
@@ -42,7 +45,7 @@ export const AdminControlRoom: React.FC = () => {
   };
 
   useEffect(() => {
-    fetch('/api/admin/session', { credentials: 'include' }).then((response) => response.json()).then((data) => {
+     fetch(apiUrl('/api/admin/session'), { credentials: 'include' }).then((response) => response.json()).then((data) => {
       setAuthenticated(Boolean(data.authenticated));
       setConfigured(data.configured !== false);
       if (data.authenticated) void load();
@@ -58,7 +61,7 @@ export const AdminControlRoom: React.FC = () => {
   const login = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch('/api/admin/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+     const response = await fetch(apiUrl('/api/admin/login'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     if (!response.ok) return setMessage(data.error || 'Unable to sign in.');
@@ -69,7 +72,7 @@ export const AdminControlRoom: React.FC = () => {
 
   const catalog = async () => {
     setBusy(true);
-    const response = await fetch('/api/admin/people/catalog', { method: 'POST', credentials: 'include' });
+     const response = await fetch(apiUrl('/api/admin/people/catalog'), { method: 'POST', credentials: 'include' });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setAutomation(data.automation || automation);
@@ -79,7 +82,7 @@ export const AdminControlRoom: React.FC = () => {
   const toggleAutomation = async () => {
     if (!automation) return;
     setBusy(true);
-    const response = await fetch('/api/admin/people/automation', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused: !automation.paused }) });
+     const response = await fetch(apiUrl('/api/admin/people/automation'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused: !automation.paused }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setAutomation(data.automation || automation);
@@ -88,7 +91,7 @@ export const AdminControlRoom: React.FC = () => {
   const savePerson = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch(editingId ? `/api/admin/people/${encodeURIComponent(editingId)}` : '/api/admin/people', { method: editingId ? 'PUT' : 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+     const response = await fetch(apiUrl(editingId ? `/api/admin/people/${encodeURIComponent(editingId)}` : '/api/admin/people'), { method: editingId ? 'PUT' : 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setMessage(response.ok ? 'Profile saved.' : data.error || 'Profile could not be saved.');
@@ -98,7 +101,7 @@ export const AdminControlRoom: React.FC = () => {
   const createPromotion = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch('/api/admin/promotions', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ personId: promotionForm.personId, label: 'Sponsored profile', reason: promotionForm.reason, endsAt: new Date(Date.now() + Number(promotionForm.hours) * 60 * 60 * 1000).toISOString() }) });
+     const response = await fetch(apiUrl('/api/admin/promotions'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ personId: promotionForm.personId, label: 'Sponsored profile', reason: promotionForm.reason, endsAt: new Date(Date.now() + Number(promotionForm.hours) * 60 * 60 * 1000).toISOString() }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setMessage(response.ok ? 'Sponsored placement published. Organic votes were unchanged.' : data.error || 'Placement could not start.');
@@ -107,7 +110,7 @@ export const AdminControlRoom: React.FC = () => {
 
   const reviewRequest = async (request: PromotionRequest, decision: 'approve' | 'reject') => {
     setBusy(true);
-    const response = await fetch(`/api/admin/promotion-requests/${encodeURIComponent(request.id)}/review`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) });
+     const response = await fetch(apiUrl(`/api/admin/promotion-requests/${encodeURIComponent(request.id)}/review`), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setMessage(response.ok ? (decision === 'approve' ? 'Paid request approved and sponsored label published.' : 'Paid request rejected.') : data.error || 'Request review failed.');
@@ -117,7 +120,7 @@ export const AdminControlRoom: React.FC = () => {
   const adjustSupportCredits = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch(`/api/admin/people/${encodeURIComponent(supportForm.personId)}/support-credits`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta: Number(supportForm.delta), reason: supportForm.reason }) });
+     const response = await fetch(apiUrl(`/api/admin/people/${encodeURIComponent(supportForm.personId)}/support-credits`), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta: Number(supportForm.delta), reason: supportForm.reason }) });
     const data = await response.json().catch(() => ({}));
     setBusy(false);
     setMessage(response.ok ? 'Support credit updated. Organic votes and rank were unchanged.' : data.error || 'Support credit could not be updated.');
@@ -126,7 +129,7 @@ export const AdminControlRoom: React.FC = () => {
 
   const archive = async (person: Person) => {
     if (!window.confirm(`Archive ${person.name}? Votes remain safe.`)) return;
-    await fetch(`/api/admin/people/${encodeURIComponent(person.id)}`, { method: 'DELETE', credentials: 'include' });
+     await fetch(apiUrl(`/api/admin/people/${encodeURIComponent(person.id)}`), { method: 'DELETE', credentials: 'include' });
     await load();
   };
 

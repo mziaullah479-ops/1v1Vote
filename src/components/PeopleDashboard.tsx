@@ -6,6 +6,7 @@ import { SiteFooter } from './SiteFooter';
 import { LiveMarketBoard } from './LiveMarketBoard';
 import { trackEvent } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
+import { apiUrl } from '../services/api';
 
 const COOLDOWN_KEY = '1v1vote-person-vote-cooldowns-v2';
 const categories: Array<'All' | PersonCategory> = ['All', 'Politics', 'Religious Scholar', 'Creator', 'Sports', 'Entertainment', 'Business'];
@@ -128,28 +129,43 @@ export const PeopleDashboard: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [liveError, setLiveError] = useState(false);
 
-  const loadPeople = async () => {
+  const loadPeople = async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/people', { cache: 'no-store' });
+      const response = await fetch(apiUrl('/api/people'), { cache: 'default', signal });
       if (!response.ok) throw new Error('Unable to load profiles');
       const payload = await response.json() as { people: Person[] };
       setPeople(sortPeople(payload.people));
       setLastUpdated(new Date());
       setLiveError(false);
     } catch {
+      if (signal?.aborted) return;
       setPeople(sortPeople(INITIAL_PEOPLE));
       setLiveError(true);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadPeople();
-    const interval = window.setInterval(() => {
-      void loadPeople();
-    }, 15000);
-    return () => window.clearInterval(interval);
+    let activeController: AbortController | undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'visible') {
+        activeController?.abort();
+        activeController = undefined;
+        return;
+      }
+      activeController?.abort();
+      activeController = new AbortController();
+      void loadPeople(activeController.signal);
+    };
+    refreshWhenVisible();
+    const interval = window.setInterval(refreshWhenVisible, 30000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      activeController?.abort();
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -170,7 +186,7 @@ export const PeopleDashboard: React.FC = () => {
 
   const handleVote = async (person: Person) => {
     try {
-      const response = await fetch(`/api/people/${encodeURIComponent(person.id)}/vote`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const response = await fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/vote`), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } });
       const payload = await response.json() as { person?: Person; nextVoteAt?: string; error?: string; retryAt?: string };
       if (!response.ok) {
         if (payload.retryAt) {
@@ -196,7 +212,7 @@ export const PeopleDashboard: React.FC = () => {
 
   const handleShare = async (person: Person) => {
     const shareUrl = `${window.location.origin}/people/${encodeURIComponent(person.slug)}`;
-    void fetch(`/api/people/${encodeURIComponent(person.id)}/share`, { method: 'POST' }).catch(() => undefined);
+    void fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/share`), { method: 'POST', credentials: 'include' }).catch(() => undefined);
     try {
       if (navigator.share) {
         trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
@@ -211,10 +227,11 @@ export const PeopleDashboard: React.FC = () => {
     }
   };
 
+  const rankById = new Map(people.map((person, index) => [person.id, index + 1]));
   const visiblePeople = people.filter((person) => {
     const query = search.trim().toLowerCase();
     const rankQuery = query.match(/(?:rank|number|#)?\s*(\d+)/)?.[1];
-    const rank = people.findIndex((item) => item.id === person.id) + 1;
+    const rank = rankById.get(person.id) || 0;
     const matchesRank = Boolean(rankQuery && Number(rankQuery) === rank);
     const matchesSearch = !query || (rankQuery ? matchesRank : `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query));
     return matchesSearch && (category === 'All' || person.category === category) && (country === 'All' || person.country === country);

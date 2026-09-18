@@ -4,6 +4,7 @@ import { Person } from '../types';
 import { setPageSeo } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
 import { PersonMarketDashboard } from './PersonMarketDashboard';
+import { apiUrl } from '../services/api';
 
 function formatCount(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
@@ -16,17 +17,14 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      fetch(`/api/people/${encodeURIComponent(slug)}`, { cache: 'no-store' }).then((response) => response.ok ? response.json() : Promise.reject(new Error('not found'))),
-      fetch('/api/people', { cache: 'no-store' }).then((response) => response.json()),
-    ]).then(([profilePayload, peoplePayload]) => {
+    void fetch(apiUrl(`/api/people/${encodeURIComponent(slug)}`), { cache: 'default' }).then((response) => response.ok ? response.json() : Promise.reject(new Error('not found'))).then((profilePayload: { person: Person; rank: number }) => {
       if (!active) return;
       const loaded = profilePayload.person as Person;
       setPerson(loaded);
-      setRank((peoplePayload.people as Person[]).findIndex((item) => item.id === loaded.id) + 1);
+      setRank(profilePayload.rank || 0);
       setMessage('');
       setPageSeo(`${loaded.name} Vote Ranking - 1v1Vote`, `Read about ${loaded.name}, view the source profile, and vote in the live 1v1Vote ranking.`, `/people/${loaded.slug}`, loaded.avatar);
-      void fetch(`/api/people/${encodeURIComponent(loaded.id)}/view`, { method: 'POST', credentials: 'include' })
+       void fetch(apiUrl(`/api/people/${encodeURIComponent(loaded.id)}/view`), { method: 'POST', credentials: 'include' })
         .then((response) => response.ok ? response.json() : null)
         .then((viewPayload) => { if (active && viewPayload?.person) setPerson(viewPayload.person as Person); })
         .catch(() => undefined);
@@ -36,7 +34,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
 
   const vote = async () => {
     if (!person) return;
-    const response = await fetch(`/api/people/${encodeURIComponent(person.id)}/vote`, { method: 'POST' });
+     const response = await fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/vote`), { method: 'POST', credentials: 'include' });
     const payload = await response.json() as { person?: Person; error?: string };
     setMessage(response.ok ? `Vote registered for ${person.name}. You can vote again after midnight.` : payload.error || 'Vote could not be registered.');
     if (payload.person) setPerson(payload.person);
@@ -45,7 +43,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
   const share = async () => {
     if (!person) return;
     const url = `${window.location.origin}/people/${person.slug}`;
-    void fetch(`/api/people/${encodeURIComponent(person.id)}/share`, { method: 'POST' });
+     void fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/share`), { method: 'POST', credentials: 'include' });
     if (navigator.share) await navigator.share({ title: `${person.name} on 1v1Vote`, text: `Vote for ${person.name} on 1v1Vote.`, url });
     else await navigator.clipboard.writeText(url);
   };

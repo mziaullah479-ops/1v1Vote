@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, CircleDollarSign, ExternalLink, Megaphone, ShieldCheck } from 'lucide-react';
 import { PROMOTION_PLANS } from '../data/matchPricing';
 import { Person } from '../types';
+import { apiUrl } from '../services/api';
 
 interface PromotionConfig {
   paymentAccountLabel: string;
@@ -26,8 +27,8 @@ export const PromoteProfileView: React.FC = () => {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/people', { cache: 'no-store' }).then((response) => response.json()),
-      fetch('/api/promotion-config').then((response) => response.json()),
+       fetch(apiUrl('/api/people'), { cache: 'default' }).then((response) => response.json()),
+       fetch(apiUrl('/api/promotion-config')).then((response) => response.json()),
     ]).then(([peopleData, configData]) => {
       setPeople(peopleData.people || []);
       setConfig(configData);
@@ -40,8 +41,9 @@ export const PromoteProfileView: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/promotion-requests', {
-        method: 'POST',
+       const response = await fetch(apiUrl('/api/promotion-requests'), {
+         method: 'POST',
+         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personId, requesterName, requesterEmail, durationHours, paymentReference, reason, label: 'Sponsored profile' }),
       });

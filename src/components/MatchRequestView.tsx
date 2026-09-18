@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, CircleDollarSign, ExternalLink, ShieldCheck } from 'lucide-react';
 import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
 import { MatchRequest, Region, UserProfile } from '../types';
+import { apiUrl } from '../services/api';
 
 interface MatchRequestViewProps {
   user: UserProfile | null;
@@ -44,7 +45,7 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch('/api/match-request-config')
+    fetch(apiUrl('/api/match-request-config'))
       .then((response) => response.json())
       .then((data) => setConfig(data))
       .catch(() => undefined);
@@ -52,7 +53,7 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
 
   useEffect(() => {
     if (!user) return;
-    fetch('/api/match-requests', { credentials: 'include' })
+    fetch(apiUrl('/api/match-requests'), { credentials: 'include' })
       .then((response) => response.ok ? response.json() : { requests: [] })
       .then((data) => setRequests(data.requests || []))
       .catch(() => undefined);
@@ -78,7 +79,7 @@ export const MatchRequestView: React.FC<MatchRequestViewProps> = ({ user, onOpen
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/match-requests', {
+      const response = await fetch(apiUrl('/api/match-requests'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
