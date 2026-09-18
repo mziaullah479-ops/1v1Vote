@@ -540,7 +540,10 @@ export class PersistentStore {
 
     const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
     const tursoToken = process.env.TURSO_AUTH_TOKEN?.trim();
-    if (process.env.NODE_ENV === 'production' && (!tursoUrl || !tursoToken)) {
+    const isGithubActionsSmokeTest = process.env.GITHUB_ACTIONS === 'true'
+      && process.env.CI === 'true'
+      && Boolean(process.env.DATA_DIR);
+    if (process.env.NODE_ENV === 'production' && (!tursoUrl || !tursoToken) && !isGithubActionsSmokeTest) {
       throw new Error('A Turso database is required in production so deployments cannot erase application data.');
     }
     if (tursoUrl && !tursoToken) throw new Error('TURSO_AUTH_TOKEN must be configured with TURSO_DATABASE_URL.');
