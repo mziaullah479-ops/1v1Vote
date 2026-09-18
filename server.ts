@@ -712,6 +712,8 @@ async function startServer() {
   });
 
   app.get('/feed.xml', (_req, res) => {
+    const founderLink = `${siteOrigin()}/founder`;
+    const founderItem = `<item><title>Muhammad Ziaullah - Founder of 1v1Vote</title><link>${escapeXml(founderLink)}</link><guid isPermaLink="true">${escapeXml(founderLink)}</guid><description>Meet Muhammad Ziaullah, an independent developer and entrepreneur building practical, user-first digital products.</description></item>`;
     const items = store.getPeopleSnapshot()
       .filter((person) => !person.archivedAt)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
@@ -721,7 +723,7 @@ async function startServer() {
         const description = `${person.shortBio} Vote once per calendar day on 1v1Vote.`;
         return `<item><title>${escapeXml(`${person.name} on 1v1Vote`)}</title><link>${escapeXml(link)}</link><guid isPermaLink="true">${escapeXml(link)}</guid><description>${escapeXml(description)}</description><pubDate>${new Date(person.updatedAt).toUTCString()}</pubDate></item>`;
       }).join('');
-    return res.type('application/rss+xml').send(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>1v1Vote public profiles</title><link>${escapeXml(siteOrigin())}</link><description>Source-backed public profiles and live daily voting on 1v1Vote.</description><link>${escapeXml(`${siteOrigin()}/feed.xml`)}</link>${items}</channel></rss>`);
+    return res.type('application/rss+xml').send(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>1v1Vote public profiles</title><link>${escapeXml(siteOrigin())}</link><description>Source-backed public profiles and live daily voting on 1v1Vote.</description><link>${escapeXml(`${siteOrigin()}/feed.xml`)}</link>${founderItem}${items}</channel></rss>`);
   });
 
   app.get('/sitemap.xml', (_req, res) => {
