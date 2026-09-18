@@ -34,12 +34,16 @@ jobs:
            node .server/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
-              break
-            fi
-            sleep 1
-          done
+           for attempt in {1..20}; do
+             if curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
+               break
+             fi
+             sleep 1
+           done
+           if ! curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
+             node -e "console.log(require('fs').readFileSync(process.env.RUNNER_TEMP + '/1v1vote-server.log', 'utf8'))"
+             exit 1
+           fi
           curl --fail --silent -c "$RUNNER_TEMP/user-cookies.txt" \
             -H 'content-type: application/json' \
             -d '{"name":"CI Tester","email":"ci@example.com","password":"ci-test-password"}' \
