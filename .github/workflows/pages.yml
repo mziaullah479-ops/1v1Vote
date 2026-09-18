@@ -46,7 +46,9 @@ jobs:
             -H 'content-type: application/json' \
             -d '{"password":"ci-test-password"}' \
             http://127.0.0.1:4175/api/admin/login > /dev/null
+          csrf_token=$(node -e "const line=require('fs').readFileSync(process.env.RUNNER_TEMP + '/admin-cookies.txt','utf8').split('\\n').find((value)=>value.includes('v1_admin_csrf')); console.log(line ? line.split('\\t').at(-1) : '')")
           curl --fail --show-error --silent -b "$RUNNER_TEMP/admin-cookies.txt" \
+            -H "X-CSRF-Token: $csrf_token" \
             -X POST http://127.0.0.1:4175/api/admin/backup > /dev/null
           kill "$server_pid"
           wait "$server_pid" || true
