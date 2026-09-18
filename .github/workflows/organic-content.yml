@@ -1,0 +1,31 @@
+name: Prepare organic content drafts
+
+on:
+  schedule:
+    - cron: '17 9 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drafts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build reviewable profile drafts
+        env:
+          SITE_ORIGIN: https://1v1vote.com
+          CONTENT_OUTPUT_DIR: content-output
+        run: node scripts/create-content-drafts.mjs
+      - name: Upload drafts for manual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: organic-content-drafts
+          path: content-output/organic-drafts.md
+          retention-days: 14

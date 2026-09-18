@@ -5,12 +5,12 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
-import { scrapeSocialProfile } from './src/server/socialScraper';
-import { PersistentStore, StoreError } from './src/server/persistentStore';
+import { PersistentStore, StoreError } from './src/server/persistentstore';
 import { fetchRemoteImage, ImageFetchError, type RemoteImage } from './src/server/imageService';
-import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from './src/data/matchPricing';
+import { MATCH_REQUEST_PLANS } from './src/data/matchpricing';
 
 const ADMIN_COOKIE = 'v1_admin_session';
+const ADMIN_CSRF_COOKIE = 'v1_admin_csrf';
 const SESSION_COOKIE = 'v1_user_session';
 const VISITOR_COOKIE = 'v1_visitor_id';
 const failedAdminLogins = new Map<string, { count: number; resetAt: number }>();
@@ -148,8 +148,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/public-figures': 'Public Figures Directory', '/leaders': 'Leaders and Public Voices', '/scholars': 'Scholars Directory', '/athletes': 'Athletes Directory',
     '/actors': 'Actors and Entertainers', '/entrepreneurs': 'Entrepreneurs Directory', '/pakistani-leaders': 'Pakistani Leaders', '/pakistani-scholars': 'Pakistani Scholars',
     '/international-stars': 'International Public Figures', '/vote-guide': '1v1Vote Voting Guide',
-    '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map',
-    '/promote': 'Promote a Public Profile', '/ai': '1v1Vote AI Guide',
+     '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map', '/founder': 'Founder & Project Steward',
   };
   const titleOverrides: Record<string, string> = {
     '/about': 'About 1v1Vote - Public Opinion Rankings',
@@ -157,11 +156,10 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/faq': '1v1Vote FAQ - Public Figure Voting Questions',
     '/contact': 'Contact 1v1Vote - Profile Corrections',
     '/request': 'Request a Profile Review - 1v1Vote',
-    '/promote': 'Promote a Public Profile - 1v1Vote',
-    '/ai': '1v1Vote AI Guide - Public Figure Rankings and Sources',
     '/vote': 'Vote for Public Figures | 1v1Vote',
     '/vote-guide': '1v1Vote Voting Guide',
-    '/site-map': '1v1Vote Site Map',
+     '/site-map': '1v1Vote Site Map',
+     '/founder': 'Founder & Project Steward - 1v1Vote',
   };
   const descriptionOverrides: Record<string, string> = {
     '/about': 'Learn how 1v1Vote ranks public figures through transparent daily voting.',
@@ -169,11 +167,10 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/faq': 'Answers to common questions about 1v1Vote voting, rankings, and profiles.',
     '/contact': 'Contact 1v1Vote about profile corrections and source information.',
     '/request': 'Request a correction or profile review for the 1v1Vote directory.',
-    '/promote': 'Request a transparent paid promotion for an active 1v1Vote public profile.',
-    '/ai': 'A machine-readable guide to 1v1Vote profiles, voting, rankings, promotions, and public sources.',
     '/vote': 'Support public figures you follow and help shape the live 1v1Vote ranking. Vote once per calendar day with no account required.',
     '/vote-guide': 'A clear guide to voting, cooldowns, rankings, and profile pages.',
-    '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
+     '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
+     '/founder': 'Learn why 1v1Vote was built and how its independent founder approaches public profiles, daily voting, and editorial responsibility.',
   };
   const title = person
     ? `${person.name} Vote Ranking - 1v1Vote`
@@ -208,6 +205,10 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     result = result.replace('</head>', `<script type="application/ld+json">${jsonLd}</script></head>`);
   }
   result = result.replace(/<link rel=\"canonical\" href=\"[^\"]*\"\s*\/>/i, `<link rel=\"canonical\" href=\"${escapeHtml(url)}\" />`);
+  const fallback = person
+    ? `<main style="max-width:760px;margin:0 auto;padding:48px 20px;font-family:system-ui,sans-serif;color:#e2e8f0;background:#060a13;min-height:100vh"><a href="/" style="color:#7dd3fc">Back to live rankings</a><article style="margin-top:32px"><p style="color:#7dd3fc;text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:700">Ranked public profile</p><h1 style="font-size:42px;line-height:1.1;color:#fff">${escapeHtml(person.name)} Vote Ranking</h1><p style="font-size:18px;line-height:1.7">${escapeHtml(person.shortBio)}</p><p style="line-height:1.8">${escapeHtml(person.bio || person.shortBio)}</p><p><strong>Category:</strong> ${escapeHtml(person.category)} &nbsp; <strong>Country:</strong> ${escapeHtml(person.country)}</p><p><a href="${escapeHtml(person.profileUrl || `${origin}/people/${person.slug}`)}" style="color:#7dd3fc">Open public source</a></p><p>Vote for ${escapeHtml(person.name)} on 1v1Vote. Votes are recorded once per profile per calendar day.</p></article></main>`
+    : `<main style="max-width:760px;margin:0 auto;padding:48px 20px;font-family:system-ui,sans-serif;color:#e2e8f0;background:#060a13;min-height:100vh"><a href="/" style="color:#7dd3fc">Back to live rankings</a><h1 style="font-size:40px;color:#fff">${escapeHtml(title)}</h1><p style="font-size:18px;line-height:1.7">${escapeHtml(description)}</p><p>Explore source-backed public profiles, transparent daily voting, and live rankings on 1v1Vote.</p><p><a href="/people" style="color:#7dd3fc">Browse the public directory</a></p></main>`;
+  result = result.replace('<div id="root"></div>', `<div id="root">${fallback}</div>`);
   return result;
 }
 
@@ -233,7 +234,7 @@ async function startServer() {
     if (origin && allowedOrigins.has(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       res.setHeader('Vary', 'Origin');
     }
@@ -256,8 +257,6 @@ async function startServer() {
   app.set('trust proxy', 1);
 
   app.use('/api/image', rateLimit('image', 120, 60 * 1000));
-  app.use('/api/detect-social', rateLimit('social-detection', 10, 60 * 1000));
-
   const isTrustedMutation = (req: express.Request) => {
     const isGithubActionsSmokeTest = process.env.GITHUB_ACTIONS === 'true'
       && process.env.CI === 'true'
@@ -285,6 +284,16 @@ async function startServer() {
 
   app.use('/api/admin', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
+    return next();
+  });
+
+  app.use('/api/admin', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.path === '/login' || req.path === '/logout') return next();
+    const cookieToken = req.cookies?.[ADMIN_CSRF_COOKIE];
+    const headerToken = req.get('x-csrf-token');
+    if (!cookieToken || !headerToken || !safeEqual(cookieToken, headerToken)) {
+      return res.status(403).json({ error: 'A valid admin security token is required.' });
+    }
     return next();
   });
 
@@ -397,15 +406,6 @@ async function startServer() {
     }
   });
 
-  app.post('/api/people/:personId/view', rateLimit('person-view', 60, 60 * 1000), async (req, res) => {
-    try {
-      const { identityKey } = getIdentity(req, res);
-      return res.json({ person: await store.recordPersonView(req.params.personId, identityKey) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
   app.get('/api/matches', (req, res) => {
     res.json(store.getSnapshot(getUser(req)?.id));
   });
@@ -449,14 +449,6 @@ async function startServer() {
     });
   });
 
-  app.get('/api/promotion-config', (_req, res) => {
-    res.json({
-      plans: PROMOTION_PLANS,
-      paymentAccountLabel: process.env.PAYMENT_ACCOUNT_LABEL?.trim() || 'Payment details will be shown by the admin.',
-      paymentInstructions: process.env.PAYMENT_INSTRUCTIONS?.trim() || 'Submit your payment through the approved account and enter the transaction reference below. An admin verifies it before publishing.',
-    });
-  });
-
   app.get('/api/match-requests', (req, res) => {
     const user = getUser(req);
     if (!user) return res.status(401).json({ error: 'Please sign in to view your match requests.' });
@@ -468,14 +460,6 @@ async function startServer() {
     if (!user) return res.status(401).json({ error: 'Please sign in before submitting a match request.', code: 'AUTH_REQUIRED' });
     try {
       return res.status(201).json({ request: await store.createMatchRequest(user.id, req.body || {}) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
-  app.post('/api/promotion-requests', async (req, res) => {
-    try {
-      return res.status(201).json({ request: await store.createPromotionRequest(req.body || {}) });
     } catch (error) {
       return errorResponse(res, error);
     }
@@ -578,7 +562,11 @@ async function startServer() {
   });
 
   app.get('/api/admin/session', (req, res) => {
-    res.json({ authenticated: isAdmin(req), configured: Boolean(adminPassword) });
+    const authenticated = isAdmin(req);
+    if (authenticated && !req.cookies?.[ADMIN_CSRF_COOKIE]) {
+      res.cookie(ADMIN_CSRF_COOKIE, crypto.randomBytes(32).toString('hex'), { ...cookieOptions(1000 * 60 * 60 * 8), httpOnly: false });
+    }
+    res.json({ authenticated, configured: Boolean(adminPassword) });
   });
 
   app.get('/api/admin/match-requests', (req, res) => {
@@ -591,67 +579,9 @@ async function startServer() {
     return res.json({ people: store.getAdminPeopleSnapshot() });
   });
 
-  app.get('/api/admin/people/automation', (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    return res.json({ automation: store.getAutomationStatus() });
-  });
-
-  app.get('/api/admin/promotions', (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    return res.json({ promotions: store.getPromotions() });
-  });
-
   app.get('/api/admin/audit', (req, res) => {
     if (!requireAdmin(req, res)) return;
     return res.json({ audit: store.getAudit(Number(req.query.limit) || 100) });
-  });
-
-  app.get('/api/admin/support-adjustments', (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    return res.json({ adjustments: store.getSupportAdjustments(typeof req.query.personId === 'string' ? req.query.personId : undefined) });
-  });
-
-  app.get('/api/admin/promotion-requests', (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    return res.json({ requests: store.getPromotionRequests() });
-  });
-
-  app.post('/api/admin/promotions', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      return res.status(201).json({ promotion: await store.createPromotion(req.body || {}) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
-  app.post('/api/admin/people/:personId/support-credits', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      return res.json(await store.adjustSupportCredits(req.params.personId, Number(req.body?.delta), String(req.body?.reason || ''), 'admin'));
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
-  app.delete('/api/admin/promotions/:promotionId', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      return res.json({ promotion: await store.revokePromotion(req.params.promotionId) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
-  app.post('/api/admin/promotion-requests/:requestId/review', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      const decision = req.body?.decision === 'approve' ? 'approve' : req.body?.decision === 'reject' ? 'reject' : null;
-      if (!decision) return res.status(400).json({ error: 'A review decision is required.' });
-      return res.json({ request: await store.reviewPromotionRequest(req.params.requestId, decision, 'admin', String(req.body?.adminNote || '')) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
   });
 
   app.post('/api/admin/people', async (req, res) => {
@@ -719,12 +649,14 @@ async function startServer() {
     failedAdminLogins.delete(ip);
     const token = await store.createAdminSession();
     res.cookie(ADMIN_COOKIE, token, cookieOptions(1000 * 60 * 60 * 8));
+    res.cookie(ADMIN_CSRF_COOKIE, crypto.randomBytes(32).toString('hex'), { ...cookieOptions(1000 * 60 * 60 * 8), httpOnly: false });
     return res.json({ authenticated: true });
   });
 
   app.post('/api/admin/logout', async (req, res) => {
     await store.deleteAdminSession(req.cookies?.[ADMIN_COOKIE]);
     res.clearCookie(ADMIN_COOKIE, cookieOptions(0));
+    res.clearCookie(ADMIN_CSRF_COOKIE, { ...cookieOptions(0), httpOnly: false });
     return res.json({ authenticated: false });
   });
 
@@ -748,33 +680,6 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/people/refresh', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      return res.json({ automation: await store.runPeopleAutomation(true), people: store.getPeopleSnapshot() });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
-  app.post('/api/admin/people/catalog', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      return res.status(202).json({ automation: await store.startPeopleCatalogImport(200) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
-  app.post('/api/admin/people/automation', async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      return res.json({ automation: await store.setPeopleAutomationPaused(Boolean(req.body?.paused)) });
-    } catch (error) {
-      return errorResponse(res, error);
-    }
-  });
-
   app.post('/api/admin/backup', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
@@ -790,86 +695,52 @@ async function startServer() {
     return res.json({ backups: await store.listBackups() });
   });
 
-  app.get('/api/detect-social', async (req, res) => {
-    const targetUrl = (req.query.url as string) || '';
-    const nameHint = (req.query.name as string) || undefined;
-    if (!targetUrl.trim()) return res.status(400).json({ error: 'URL query parameter is required' });
-    try {
-      return res.json(await scrapeSocialProfile(targetUrl, nameHint));
-    } catch (error: any) {
-      const status = error?.message?.startsWith('Only YouTube') ? 400 : 502;
-      return res.status(status).json({ error: error.message || 'Failed to detect profile' });
-    }
-  });
-
   app.get('/llms.txt', (_req, res) => {
     res.type('text/plain').send([
       '# 1v1Vote',
       '1v1Vote is a public-opinion directory and daily voting index for notable people.',
       'Public rules: one organic vote per profile per calendar day; the reset happens at midnight Asia/Karachi time. Ranking is organic votes, then shares, then name.',
-      'Paid promotions are time-limited sponsored visibility placements and never change votes or rankings.',
-      'Use /people for profiles, /ai for the plain-language guide, /ai-context.json for machine-readable data, and /sitemap.xml for public URLs.',
+       'Use /people for profiles and /sitemap.xml for public URLs.',
+       `Founder: Muhammad Ziaullah — independent developer and entrepreneur building practical, user-first digital products.`,
+       `Founder page: ${siteOrigin()}/founder`,
+       `RSS feed: ${siteOrigin()}/feed.xml`,
     ].join('\n'));
   });
 
-  app.get('/ai-context.json', (_req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=300');
-    return res.json({
-      site: '1v1Vote',
-      siteUrl: siteOrigin(),
-      purpose: 'Public-opinion directory and daily voting index for notable people.',
-      rules: {
-        voteCooldownHours: 24,
-        ranking: 'organic votes descending, then shares descending, then name ascending',
-        paidPromotion: 'sponsored visibility only; never changes organic votes or ranking totals',
-        publicSignalMarket: 'modelled public-source and visible-reach trend index; never a financial price and never an automatic vote',
-      },
-      resources: { guide: `${siteOrigin()}/ai`, directory: `${siteOrigin()}/people`, sitemap: `${siteOrigin()}/sitemap.xml` },
-       profiles: store.getPeopleSnapshot().map((person) => ({ name: person.name, slug: person.slug, category: person.category, country: person.country, summary: person.shortBio, sourceUrl: person.profileUrl, profileUrl: `${siteOrigin()}/people/${person.slug}`, votes: person.votes, shares: person.shares, views: person.views || 0, socialGrowth24h: person.socialGrowth24h, sponsored: Boolean(person.promotion), publicSignal: person.market?.publicSignal, signalIndex: person.market?.index, change24h: person.market?.change24h })),
-    });
+  app.get('/robots.txt', (_req, res) => {
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nSitemap: ${siteOrigin()}/sitemap.xml\n`);
   });
 
-  app.get('/robots.txt', (_req, res) => {
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${siteOrigin()}/sitemap.xml\n`);
+  app.get('/feed.xml', (_req, res) => {
+    const items = store.getPeopleSnapshot()
+      .filter((person) => !person.archivedAt)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, 50)
+      .map((person) => {
+        const link = `${siteOrigin()}/people/${person.slug}`;
+        const description = `${person.shortBio} Vote once per calendar day on 1v1Vote.`;
+        return `<item><title>${escapeXml(`${person.name} on 1v1Vote`)}</title><link>${escapeXml(link)}</link><guid isPermaLink="true">${escapeXml(link)}</guid><description>${escapeXml(description)}</description><pubDate>${new Date(person.updatedAt).toUTCString()}</pubDate></item>`;
+      }).join('');
+    return res.type('application/rss+xml').send(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>1v1Vote public profiles</title><link>${escapeXml(siteOrigin())}</link><description>Source-backed public profiles and live daily voting on 1v1Vote.</description><link>${escapeXml(`${siteOrigin()}/feed.xml`)}</link>${items}</channel></rss>`);
   });
 
   app.get('/sitemap.xml', (_req, res) => {
     const paths = new Set([
-      '/', '/request', '/promote', '/ai', '/about', '/how-it-works', '/rankings', '/people', '/vote', '/discover', '/profiles', '/sources',
+        '/', '/request', '/about', '/how-it-works', '/rankings', '/people', '/vote', '/discover', '/profiles', '/sources',
       '/editorial-policy', '/data-safety', '/privacy', '/terms', '/faq', '/contact', '/pakistan', '/india', '/usa', '/global',
       '/politics', '/religious-scholars', '/sports', '/entertainment', '/business', '/public-figures', '/leaders', '/scholars',
       '/athletes', '/actors', '/entrepreneurs', '/pakistani-leaders', '/pakistani-scholars', '/international-stars', '/vote-guide',
-      '/categories', '/country-rankings', '/daily-vote', '/profile-corrections', '/site-map',
+       '/categories', '/country-rankings', '/daily-vote', '/profile-corrections', '/site-map', '/founder',
       ...store.getPeopleSnapshot().map((person) => `/people/${person.slug}`),
     ]);
     const urls = [...paths].map((pathname) => `<url><loc>${escapeXml(`${siteOrigin()}${pathname}`)}</loc></url>`).join('');
     return res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
   });
 
-  app.post('/api/detect-social', async (req, res) => {
-    const targetUrl = (req.body?.url as string) || '';
-    const nameHint = (req.body?.name as string) || undefined;
-    if (!targetUrl.trim()) return res.status(400).json({ error: 'URL parameter is required in request body' });
-    try {
-      return res.json(await scrapeSocialProfile(targetUrl, nameHint));
-    } catch (error: any) {
-      const status = error?.message?.startsWith('Only YouTube') ? 400 : 502;
-      return res.status(status).json({ error: error.message || 'Failed to detect profile' });
-    }
-  });
-
   const backupTimer = setInterval(() => {
     store.backupNow().catch((error) => console.error('Scheduled backup failed:', error));
   }, 1000 * 60 * 60 * 6);
   backupTimer.unref?.();
-
-  const profileRefreshTimer = setInterval(() => {
-    store.runPeopleAutomation().catch((error) => console.error('Scheduled profile automation failed:', error));
-  }, 1000 * 60 * 10);
-  profileRefreshTimer.unref?.();
-  setTimeout(() => {
-    store.runPeopleAutomation().catch((error) => console.error('Initial profile automation failed:', error));
-  }, 60000).unref?.();
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
@@ -918,7 +789,6 @@ async function startServer() {
 
   const shutdown = async () => {
     clearInterval(backupTimer);
-    clearInterval(profileRefreshTimer);
     await store.backupNow().catch((error) => console.error('Shutdown backup failed:', error));
     server.close(() => process.exit(0));
   };
