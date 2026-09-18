@@ -158,7 +158,8 @@ export const PeopleDashboard: React.FC = () => {
       activeController = new AbortController();
       void loadPeople(activeController.signal);
     };
-    refreshWhenVisible();
+    // Load once even when the tab starts hidden; visibility only controls refreshes.
+    void loadPeople();
     const interval = window.setInterval(refreshWhenVisible, 30000);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
@@ -251,11 +252,6 @@ export const PeopleDashboard: React.FC = () => {
           <nav className="hidden items-center gap-1 rounded-full border border-slate-800/80 bg-slate-950/30 p-1 md:flex" aria-label="Primary navigation"><a href="/rankings" className="rounded-full px-3 py-2 text-[11px] font-black text-slate-400 transition hover:bg-sky-400/10 hover:text-sky-300">Live rankings</a><a href="/people" className="rounded-full px-3 py-2 text-[11px] font-black text-slate-400 transition hover:bg-emerald-400/10 hover:text-emerald-300">Directory</a><a href="/ai" className="rounded-full px-3 py-2 text-[11px] font-black text-slate-400 transition hover:bg-violet-400/10 hover:text-violet-300">AI guide</a><a href="/promote" className="rounded-full px-3 py-2 text-[11px] font-black text-slate-400 transition hover:bg-amber-400/10 hover:text-amber-300">Promote</a></nav>
           <div className="hidden items-center gap-2 text-xs font-semibold text-slate-400 sm:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Live rankings update automatically</div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3 md:hidden [scrollbar-width:none]" aria-label="Mobile navigation">
-          <a href="/rankings" className="shrink-0 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-[11px] font-black text-sky-200">Live rankings</a>
-          <a href="/people" className="shrink-0 rounded-full border border-slate-800 bg-slate-950/30 px-3 py-2 text-[11px] font-black text-slate-400">Directory</a>
-          <a href="/how-it-works" className="shrink-0 rounded-full border border-slate-800 bg-slate-950/30 px-3 py-2 text-[11px] font-black text-slate-400">How it works</a>
-        </nav>
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
@@ -271,7 +267,7 @@ export const PeopleDashboard: React.FC = () => {
                 <a href="/how-it-works" className="inline-flex min-h-10 items-center rounded-xl border border-slate-700 bg-slate-950/20 px-4 text-xs font-black text-slate-200 transition hover:border-sky-400/60 hover:text-sky-200">See how voting works</a>
               </div>
             </div>
-            <div className="hero-signal-panel rounded-[1.6rem] p-5">
+            <div className="hero-signal-panel hidden rounded-[1.6rem] p-5 sm:block">
               <span className="hero-signal-dot" />
               <div className="relative z-10 flex items-center justify-between">
                 <span className="mono-label text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">Signal room</span>
@@ -283,7 +279,7 @@ export const PeopleDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="relative mt-8 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-slate-800/80 pt-5 sm:grid-cols-4 sm:gap-8">
+          <div className="relative mt-8 hidden grid-cols-2 gap-x-4 gap-y-4 border-t border-slate-800/80 pt-5 sm:grid sm:grid-cols-4 sm:gap-8">
             <div><div className="text-xl font-black text-white">{formatCount(people.length)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Active profiles</div></div>
             <div><div className="text-xl font-black text-white">{formatCount(totalVotes)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Organic votes</div></div>
             <div><div className="text-xl font-black text-white">{formatCount(people.reduce((sum, person) => sum + (person.views || 0), 0))}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Profile views</div></div>
