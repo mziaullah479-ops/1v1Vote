@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>1v1Vote public profiles</title>
+    <link>https://1v1vote.com/</link>
+    <description>Source-backed public profiles and live daily voting on 1v1Vote.</description>
+    <item>
+      <title>About 1v1Vote</title>
+      <link>https://1v1vote.com/about</link>
+      <guid isPermaLink="true">https://1v1vote.com/about</guid>
+      <description>Learn how 1v1Vote ranks public figures through transparent daily voting.</description>
+    </item>
+    <item>
+      <title>Muhammad Ziaullah - Founder of 1v1Vote</title>
+      <link>https://1v1vote.com/founder</link>
+      <guid isPermaLink="true">https://1v1vote.com/founder</guid>
+      <description>Meet Muhammad Ziaullah, an independent developer and entrepreneur building practical, user-first digital products.</description>
+    </item>
+  </channel>
+</rss>
