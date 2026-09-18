@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, ArrowDownRight, ArrowUpRight, Info, Radio, ShieldCheck, TrendingUp } from 'lucide-react';
-import { buildPersonMarket } from '../data/personMarket';
+import { buildPersonMarket } from '../data/personmarket';
 import { MarketPeriod, Person } from '../types';
 
 const periods: Array<{ key: MarketPeriod; label: string }> = [

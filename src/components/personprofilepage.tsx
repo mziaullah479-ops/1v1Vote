@@ -3,7 +3,7 @@ import { ArrowLeft, Check, ExternalLink, Share2, Vote } from 'lucide-react';
 import { Person } from '../types';
 import { setPageSeo } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
-import { PersonMarketDashboard } from './PersonMarketDashboard';
+import { PersonMarketDashboard } from './personmarketdashboard';
 import { apiUrl } from '../services/api';
 
 function formatCount(value: number) {

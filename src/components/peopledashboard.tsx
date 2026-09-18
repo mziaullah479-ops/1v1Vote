@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Check, ChevronUp, Clock3, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
 import { Person, PersonCategory, PersonCountry } from '../types';
-import { SiteFooter } from './SiteFooter';
+import { SiteFooter } from './sitefooter';
 import { trackEvent } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
 import { apiUrl } from '../services/api';
