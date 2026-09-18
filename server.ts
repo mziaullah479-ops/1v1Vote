@@ -7,13 +7,85 @@ import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 import { scrapeSocialProfile } from './src/server/socialScraper';
 import { PersistentStore, StoreError } from './src/server/persistentStore';
-import { fetchRemoteImage, ImageFetchError } from './src/server/imageService';
+import { fetchRemoteImage, ImageFetchError, type RemoteImage } from './src/server/imageService';
 import { MATCH_REQUEST_PLANS, PROMOTION_PLANS } from './src/data/matchPricing';
 
 const ADMIN_COOKIE = 'v1_admin_session';
 const SESSION_COOKIE = 'v1_user_session';
 const VISITOR_COOKIE = 'v1_visitor_id';
 const failedAdminLogins = new Map<string, { count: number; resetAt: number }>();
+const failedAuthAttempts = new Map<string, { count: number; resetAt: number }>();
+const publicRateLimits = new Map<string, { count: number; resetAt: number }>();
+const imageCache = new Map<string, { expiresAt: number; image: RemoteImage }>();
+const pendingImageRequests = new Map<string, Promise<RemoteImage>>();
+let imageCacheBytes = 0;
+const IMAGE_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
+const IMAGE_CACHE_MAX_BYTES = 32 * 1024 * 1024;
+const IMAGE_CACHE_ENTRY_MAX_BYTES = 2 * 1024 * 1024;
+
+function pruneAttempts(map: Map<string, { count: number; resetAt: number }>, now: number) {
+  for (const [key, attempt] of map) {
+    if (attempt.resetAt <= now) map.delete(key);
+  }
+  if (map.size <= 10000) return;
+  const oldest = [...map.entries()].sort((left, right) => left[1].resetAt - right[1].resetAt);
+  for (const [key] of oldest.slice(0, map.size - 10000)) map.delete(key);
+}
+
+function rateLimit(bucket: string, max: number, windowMs: number): express.RequestHandler {
+  return (req, res, next) => {
+    const now = Date.now();
+    pruneAttempts(publicRateLimits, now);
+    const identity = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = `${bucket}:${identity}`;
+    const previous = publicRateLimits.get(key);
+    const attempt = previous && previous.resetAt > now
+      ? { count: previous.count + 1, resetAt: previous.resetAt }
+      : { count: 1, resetAt: now + windowMs };
+    publicRateLimits.set(key, attempt);
+    if (attempt.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((attempt.resetAt - now) / 1000)));
+      return res.status(429).json({ error: 'Too many requests. Please try again shortly.' });
+    }
+    return next();
+  };
+}
+
+function imageCacheKey(source: string, width: number) {
+  return `${source}\n${width}`;
+}
+
+async function cachedRemoteImage(source: string, width: number) {
+  const key = imageCacheKey(source, width);
+  const cached = imageCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    imageCache.delete(key);
+    imageCache.set(key, cached);
+    return cached.image;
+  }
+  if (cached) {
+    imageCache.delete(key);
+    imageCacheBytes -= cached.image.body.length;
+  }
+  const pending = pendingImageRequests.get(key);
+  if (pending) return pending;
+  const request = fetchRemoteImage(source, width).then((image) => {
+    if (image.body.length <= IMAGE_CACHE_ENTRY_MAX_BYTES) {
+      while (imageCacheBytes + image.body.length > IMAGE_CACHE_MAX_BYTES && imageCache.size > 0) {
+        const oldestKey = imageCache.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        const oldest = imageCache.get(oldestKey);
+        imageCache.delete(oldestKey);
+        if (oldest) imageCacheBytes -= oldest.image.body.length;
+      }
+      imageCache.set(key, { expiresAt: Date.now() + IMAGE_CACHE_TTL_MS, image });
+      imageCacheBytes += image.body.length;
+    }
+    return image;
+  }).finally(() => pendingImageRequests.delete(key));
+  pendingImageRequests.set(key, request);
+  return request;
+}
 
 function safeEqual(left: string, right: string) {
   const a = Buffer.from(left);
@@ -28,8 +100,7 @@ function errorResponse(res: express.Response, error: unknown) {
 }
 
 function cookieOptions(maxAge: number) {
-  const frontendOrigin = process.env.FRONTEND_ORIGIN?.split(',')[0]?.trim();
-  const crossSiteFrontend = Boolean(frontendOrigin && frontendOrigin !== siteOrigin());
+  const crossSiteFrontend = (process.env.FRONTEND_ORIGIN || '').split(',').map((origin) => origin.trim()).some((origin) => origin && origin !== siteOrigin());
   const sameSite: 'none' | 'lax' = process.env.NODE_ENV === 'production' && crossSiteFrontend ? 'none' : 'lax';
   return {
     httpOnly: true,
@@ -184,6 +255,9 @@ async function startServer() {
   app.use(cookieParser());
   app.set('trust proxy', 1);
 
+  app.use('/api/image', rateLimit('image', 120, 60 * 1000));
+  app.use('/api/detect-social', rateLimit('social-detection', 10, 60 * 1000));
+
   const isTrustedMutation = (req: express.Request) => {
     const isGithubActionsSmokeTest = process.env.GITHUB_ACTIONS === 'true'
       && process.env.CI === 'true'
@@ -197,11 +271,20 @@ async function startServer() {
     return Boolean(referer && (referer === siteOrigin() || referer.startsWith(`${siteOrigin()}/`)));
   };
 
-  app.use('/api/admin', (req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store');
+  app.use('/api', (req, res, next) => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isTrustedMutation(req)) {
       return res.status(403).json({ error: 'A same-origin request is required.' });
     }
+    return next();
+  });
+
+  app.use(['/api/auth', '/api/matches', '/api/match-requests'], (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return next();
+  });
+
+  app.use('/api/admin', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
     return next();
   });
 
@@ -232,6 +315,8 @@ async function startServer() {
     const user = getUser(req);
     return { user, identityKey: user ? `user:${user.id}` : getVisitorIdentity(req, res) };
   };
+  let peoplePayloadCache: { expiresAt: number; body: string } | undefined;
+  let marketPayloadCache: { expiresAt: number; body: string } | undefined;
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: '1v1Vote', database: 'ready', timestamp: new Date().toISOString() });
@@ -242,7 +327,7 @@ async function startServer() {
     if (!source) return res.status(400).json({ error: 'An image URL is required.' });
     try {
       const width = typeof req.query.width === 'string' ? Number(req.query.width) : 960;
-      const image = await fetchRemoteImage(source, Number.isFinite(width) ? width : 960);
+      const image = await cachedRemoteImage(source, Number.isFinite(width) ? width : 960);
       res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
       res.setHeader('Content-Type', image.contentType);
       res.setHeader('Content-Length', image.body.length);
@@ -255,48 +340,64 @@ async function startServer() {
   });
 
   app.get('/api/people', (_req, res) => {
-    res.json({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() });
+    if (!peoplePayloadCache || peoplePayloadCache.expiresAt <= Date.now()) {
+      peoplePayloadCache = {
+        expiresAt: Date.now() + 5000,
+        body: JSON.stringify({ people: store.getPeopleSnapshot(), updatedAt: new Date().toISOString() }),
+      };
+    }
+    return res.type('application/json').send(peoplePayloadCache.body);
   });
 
   app.get('/api/people/market', (_req, res) => {
-    const people = store.getPeopleSnapshot().map((person) => ({
-      id: person.id,
-      slug: person.slug,
-      name: person.name,
-      avatar: person.avatar,
-      category: person.category,
-      country: person.country,
-      market: person.market,
-    }));
-    return res.json({ people, updatedAt: new Date().toISOString(), disclaimer: 'Public-signal model, not a financial price or an organic vote.' });
+    if (!marketPayloadCache || marketPayloadCache.expiresAt <= Date.now()) {
+      const people = store.getPeopleSnapshot().map((person) => ({
+        id: person.id,
+        slug: person.slug,
+        name: person.name,
+        avatar: person.avatar,
+        category: person.category,
+        country: person.country,
+        market: person.market,
+      }));
+      marketPayloadCache = {
+        expiresAt: Date.now() + 5000,
+        body: JSON.stringify({ people, updatedAt: new Date().toISOString(), disclaimer: 'Public-signal model, not a financial price or an organic vote.' }),
+      };
+    }
+    return res.type('application/json').send(marketPayloadCache.body);
   });
 
   app.get('/api/people/:personId', (req, res) => {
-    const person = store.getPerson(req.params.personId);
-    if (!person) return res.status(404).json({ error: 'Profile not found.' });
-    return res.json({ person });
+    const result = store.getPersonWithRank(req.params.personId);
+    if (!result) return res.status(404).json({ error: 'Profile not found.' });
+    return res.json(result);
   });
 
-  app.post('/api/people/:personId/vote', async (req, res) => {
+  app.post('/api/people/:personId/vote', rateLimit('person-vote', 30, 60 * 1000), async (req, res) => {
     try {
       const { identityKey } = getIdentity(req, res);
       const person = await store.voteForPerson(req.params.personId, identityKey);
+      peoplePayloadCache = undefined;
+      marketPayloadCache = undefined;
       return res.json({ person, nextVoteAt: store.getNextPersonVoteAt() });
     } catch (error) {
       return errorResponse(res, error);
     }
   });
 
-  app.post('/api/people/:personId/share', async (req, res) => {
+  app.post('/api/people/:personId/share', rateLimit('person-share', 30, 60 * 1000), async (req, res) => {
     try {
       const person = await store.sharePerson(req.params.personId);
+      peoplePayloadCache = undefined;
+      marketPayloadCache = undefined;
       return res.json({ person });
     } catch (error) {
       return errorResponse(res, error);
     }
   });
 
-  app.post('/api/people/:personId/view', async (req, res) => {
+  app.post('/api/people/:personId/view', rateLimit('person-view', 60, 60 * 1000), async (req, res) => {
     try {
       const { identityKey } = getIdentity(req, res);
       return res.json({ person: await store.recordPersonView(req.params.personId, identityKey) });
@@ -381,21 +482,39 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', async (req, res) => {
+    const password = String(req.body?.password || '');
+    if (password.length > 256) return res.status(400).json({ error: 'Password must be 256 characters or fewer.' });
+    const key = `${req.ip || req.socket.remoteAddress || 'unknown'}:${String(req.body?.email || '').trim().toLowerCase().slice(0, 160)}`;
+    const now = Date.now();
+    pruneAttempts(failedAuthAttempts, now);
+    const attempt = failedAuthAttempts.get(key);
+    if (attempt && attempt.resetAt > now && attempt.count >= 12) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
     try {
-      const result = await store.register(String(req.body?.name || ''), String(req.body?.email || ''), String(req.body?.password || ''));
+      const result = await store.register(String(req.body?.name || ''), String(req.body?.email || ''), password);
+      failedAuthAttempts.delete(key);
       res.cookie(SESSION_COOKIE, result.token, cookieOptions(1000 * 60 * 60 * 24 * 30));
       return res.status(201).json({ user: result.user });
     } catch (error) {
+      failedAuthAttempts.set(key, attempt && attempt.resetAt > now ? { count: attempt.count + 1, resetAt: attempt.resetAt } : { count: 1, resetAt: now + 15 * 60 * 1000 });
       return errorResponse(res, error);
     }
   });
 
   app.post('/api/auth/login', async (req, res) => {
+    const password = String(req.body?.password || '');
+    if (password.length > 256) return res.status(401).json({ error: 'Email or password is incorrect.' });
+    const key = `${req.ip || req.socket.remoteAddress || 'unknown'}:${String(req.body?.email || '').trim().toLowerCase().slice(0, 160)}`;
+    const now = Date.now();
+    pruneAttempts(failedAuthAttempts, now);
+    const attempt = failedAuthAttempts.get(key);
+    if (attempt && attempt.resetAt > now && attempt.count >= 12) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
     try {
-      const result = await store.login(String(req.body?.email || ''), String(req.body?.password || ''));
+      const result = await store.login(String(req.body?.email || ''), password);
+      failedAuthAttempts.delete(key);
       res.cookie(SESSION_COOKIE, result.token, cookieOptions(1000 * 60 * 60 * 24 * 30));
       return res.json({ user: result.user });
     } catch (error) {
+      failedAuthAttempts.set(key, attempt && attempt.resetAt > now ? { count: attempt.count + 1, resetAt: attempt.resetAt } : { count: 1, resetAt: now + 15 * 60 * 1000 });
       return errorResponse(res, error);
     }
   });
@@ -584,8 +703,9 @@ async function startServer() {
 
   app.post('/api/admin/login', async (req, res) => {
     if (!adminPassword) return res.status(503).json({ error: 'Admin access is not configured on this deployment.' });
-    const ip = req.ip || 'unknown';
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
+    pruneAttempts(failedAdminLogins, now);
     const attempt = failedAdminLogins.get(ip);
     if (attempt && attempt.resetAt > now && attempt.count >= 8) {
       return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
@@ -598,7 +718,7 @@ async function startServer() {
     }
     failedAdminLogins.delete(ip);
     const token = await store.createAdminSession();
-    res.cookie(ADMIN_COOKIE, token, cookieOptions(1000 * 60 * 60 * 2));
+    res.cookie(ADMIN_COOKIE, token, cookieOptions(1000 * 60 * 60 * 8));
     return res.json({ authenticated: true });
   });
 
@@ -749,7 +869,7 @@ async function startServer() {
   profileRefreshTimer.unref?.();
   setTimeout(() => {
     store.runPeopleAutomation().catch((error) => console.error('Initial profile automation failed:', error));
-  }, 5000).unref?.();
+  }, 60000).unref?.();
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
@@ -757,8 +877,10 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     const indexPath = path.join(distPath, 'index.html');
+    const indexHtml = fs.readFileSync(indexPath, 'utf8');
     app.get('/favicon.ico', (_req, res) => res.redirect(302, '/favicon.png'));
-    app.use(express.static(distPath, { index: false }));
+    app.use('/assets', express.static(path.join(distPath, 'assets'), { maxAge: '1y', immutable: true }));
+    app.use(express.static(distPath, { index: false, maxAge: '1h' }));
     app.get('*', (req, res) => {
       const measurementId = process.env.VITE_GA_MEASUREMENT_ID?.trim();
       const runtimeConfig = JSON.stringify({
@@ -784,7 +906,7 @@ async function startServer() {
            person = undefined;
          }
        }
-       const html = applyServerSeo(fs.readFileSync(indexPath, 'utf8'), requestedPath, match, person)
+       const html = applyServerSeo(indexHtml, requestedPath, match, person)
         .replace('</head>', `<script>window.__RUNTIME_CONFIG__=${runtimeConfig};</script></head>`);
       return res.type('html').send(html);
     });
