@@ -263,9 +263,9 @@ export const PeopleDashboard: React.FC = () => {
           <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
             <div className="max-w-3xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> One profile. One vote. Every day.</div>
-              <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">A live index of who the public is backing.</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">Browse source-backed people from Pakistan, India, the USA, and beyond. Cast one clear vote per profile each calendar day, then watch the ranking move.</p>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> Live index</div>
+              <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">Who is the public backing?</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">One vote per profile, every day. Browse source-backed people from Pakistan, India, the USA, and beyond, then watch the ranking move.</p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <a href="#directory" className="inline-flex min-h-10 items-center rounded-xl bg-sky-400 px-4 text-xs font-black text-slate-950 transition hover:bg-sky-300">Browse the index</a>
                 <a href="/how-it-works" className="inline-flex min-h-10 items-center rounded-xl border border-slate-700 bg-slate-950/20 px-4 text-xs font-black text-slate-200 transition hover:border-sky-400/60 hover:text-sky-200">See how voting works</a>
