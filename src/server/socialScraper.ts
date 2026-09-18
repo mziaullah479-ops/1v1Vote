@@ -12,6 +12,7 @@ export interface ScrapedSocialResult {
 
 const SUPPORTED_HOSTS = ['youtube.com', 'youtu.be', 'tiktok.com', 'instagram.com', 'twitch.tv'];
 const SOCIAL_URL_ERROR = 'Only YouTube, TikTok, Instagram, and Twitch profile URLs are supported.';
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 function isSupportedHost(hostname: string) {
   const host = hostname.toLowerCase().replace(/^www\./, '');
@@ -26,6 +27,40 @@ async function fetchWithTimeout(input: string, init: RequestInit = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function readLimitedText(response: Response) {
+  const declared = Number(response.headers.get('content-length') || 0);
+  if (declared > MAX_RESPONSE_BYTES) throw new Error('The social profile response is too large.');
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) throw new Error('The social profile response is too large.');
+    return text;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      total += result.value.byteLength;
+      if (total > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error('The social profile response is too large.');
+      }
+      chunks.push(result.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
 }
 
 export async function scrapeSocialProfile(inputUrl: string, nameHint?: string): Promise<ScrapedSocialResult> {
@@ -87,7 +122,7 @@ export async function scrapeSocialProfile(inputUrl: string, nameHint?: string): 
       });
 
       if (response.ok) {
-        const html = await response.text();
+         const html = await readLimitedText(response);
 
         // 1. Channel Name
         const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/) || html.match(/<title>([^<]+)<\/title>/);
@@ -154,7 +189,7 @@ export async function scrapeSocialProfile(inputUrl: string, nameHint?: string): 
     try {
       const oembedRes = await fetchWithTimeout(`https://www.tiktok.com/oembed?url=https://www.tiktok.com/@${cleanHandle}`);
       if (oembedRes.ok) {
-        const oData = await oembedRes.json();
+         const oData = JSON.parse(await readLimitedText(oembedRes));
         return {
           platform: 'TikTok',
           handle: `@${cleanHandle}`,

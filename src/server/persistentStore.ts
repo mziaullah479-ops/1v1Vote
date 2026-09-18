@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { createClient, type Client } from '@libsql/client';
 import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, PeopleAutomationStatus, PersonPromotion, PromotionRequest, SupportCreditAdjustment, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
@@ -110,6 +111,7 @@ interface DiscoveryCandidate {
 }
 
 const DATABASE_VERSION = 5;
+const scryptAsync = promisify(scrypt);
 const PEOPLE_AUTOMATION_INTERVAL_MS = 10 * 60 * 1000;
 const PEOPLE_REFRESH_LIMIT = 25;
 const DEFAULT_VOTE_RESET_TIME_ZONE = 'Asia/Karachi';
@@ -304,15 +306,19 @@ async function discoverFromWikipedia(existingNames: string[]) {
   ] as const;
   const existing = new Set(existingNames.map((name) => name.toLowerCase()));
   const results: DiscoveryCandidate[] = [];
-  await Promise.all(sources.map(async (source) => {
-    try {
+  let nextSource = 0;
+  const worker = async () => {
+    while (nextSource < sources.length) {
+      const source = sources[nextSource++];
+      if (!source) return;
+      try {
       const params = new URLSearchParams({
         action: 'query', format: 'json', origin: '*', generator: 'search',
          gsrsearch: source.query, gsrlimit: '20', gsrnamespace: '0', prop: 'extracts|pageimages|info|pageviews',
         exintro: '1', explaintext: '1', piprop: 'original|thumbnail', pithumbsize: '512', inprop: 'url',
       });
       const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { headers: { 'User-Agent': '1v1Vote profile research bot/1.0' } });
-      if (!response.ok) return;
+       if (!response.ok) continue;
       const payload = await response.json() as { query?: { pages?: Record<string, { title?: string; extract?: string; fullurl?: string; original?: { source?: string }; thumbnail?: { source?: string }; pageviews?: Record<string, number> }> } };
       for (const page of Object.values(payload.query?.pages || {})) {
         const name = page.title?.trim() || '';
@@ -324,10 +330,12 @@ async function discoverFromWikipedia(existingNames: string[]) {
         results.push({ name, category: source.type, country: source.country, shortBio: bio.slice(0, 180), bio: bio.slice(0, 700), profileUrl, imageUrl, popularity: Object.values(page.pageviews || {}).reduce((sum, value) => sum + (value || 0), 0) });
         existing.add(name.toLowerCase());
       }
-    } catch {
-      return;
+      } catch {
+        continue;
+      }
     }
-  }));
+  };
+  await Promise.all(Array.from({ length: 6 }, () => worker()));
   return results.sort((left, right) => (right.popularity || 0) - (left.popularity || 0)).slice(0, 300);
 }
 
@@ -335,17 +343,17 @@ function tokenHash(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function passwordHash(password: string) {
+async function passwordHash(password: string) {
   const salt = randomBytes(16);
-  const derived = scryptSync(password, salt, 64, { N: 16_384, r: 8, p: 1 });
+  const derived = await scryptAsync(password, salt, 64, { N: 16_384, r: 8, p: 1 }) as Buffer;
   return `scrypt$${salt.toString('hex')}$${derived.toString('hex')}`;
 }
 
-function verifyPassword(password: string, stored: string) {
+async function verifyPassword(password: string, stored: string) {
   const [, saltHex, hashHex] = stored.split('$');
   if (!saltHex || !hashHex) return false;
   const expected = Buffer.from(hashHex, 'hex');
-  const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length, { N: 16_384, r: 8, p: 1 });
+  const actual = await scryptAsync(password, Buffer.from(saltHex, 'hex'), expected.length, { N: 16_384, r: 8, p: 1 }) as Buffer;
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
@@ -510,6 +518,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
 export class PersistentStore {
   private state: DatabaseState;
   private writeQueue: Promise<void> = Promise.resolve();
+  private pendingPersistTimer: ReturnType<typeof setTimeout> | undefined;
   private peopleAutomationBusy = false;
 
   private constructor(
@@ -534,7 +543,7 @@ export class PersistentStore {
       localState = normalizeState(JSON.parse(await readFile(databasePath, 'utf8')) as Partial<DatabaseState>);
     } catch (error: any) {
       if (error?.code !== 'ENOENT') {
-        console.error('Database file could not be read. Starting from seed data.', error);
+        throw new Error('Database file could not be read safely. Refusing to replace it with seed data.');
       }
     }
 
@@ -580,20 +589,32 @@ export class PersistentStore {
   }
 
   private async persist() {
-    const snapshot = JSON.stringify(this.state, null, 2);
+    const snapshot = JSON.stringify(this.state);
     this.writeQueue = this.writeQueue.catch(() => undefined).then(async () => {
       if (this.remoteDatabase) {
         await this.remoteDatabase.execute({
           sql: `INSERT INTO app_state (id, state) VALUES (1, ?)
             ON CONFLICT(id) DO UPDATE SET state = excluded.state`,
-          args: [snapshot],
+            args: [snapshot],
         });
       }
-      const temporaryPath = `${this.databasePath}.${process.pid}.tmp`;
-      await writeFile(temporaryPath, snapshot, 'utf8');
-      await rename(temporaryPath, this.databasePath);
+      if (!this.remoteDatabase) {
+        const temporaryPath = `${this.databasePath}.${process.pid}.tmp`;
+        await writeFile(temporaryPath, snapshot, 'utf8');
+        await rename(temporaryPath, this.databasePath);
+      }
     });
     return this.writeQueue;
+  }
+
+  private schedulePersist() {
+    if (this.pendingPersistTimer) return;
+    const timer = setTimeout(() => {
+      this.pendingPersistTimer = undefined;
+      void this.persist().catch((error) => console.error('Scheduled persistence failed:', error));
+    }, 1500);
+    this.pendingPersistTimer = timer;
+    timer.unref?.();
   }
 
   private pruneExpiredSessions() {
@@ -639,6 +660,16 @@ export class PersistentStore {
   getPerson(idOrSlug: string) {
     const person = this.state.people.find((item) => !item.archivedAt && (item.id === idOrSlug || item.slug === idOrSlug));
     return person ? { ...person, promotion: this.activePromotionFor(person.id) } : undefined;
+  }
+
+  getPersonWithRank(idOrSlug: string) {
+    const person = this.getPerson(idOrSlug);
+    if (!person) return undefined;
+    const rank = this.state.people
+      .filter((item) => !item.archivedAt && Boolean(item.avatar))
+      .sort((left, right) => right.votes - left.votes || right.shares - left.shares || left.name.localeCompare(right.name))
+      .findIndex((item) => item.id === person.id) + 1;
+    return { person, rank };
   }
 
   getAdminPeopleSnapshot() {
@@ -892,7 +923,7 @@ export class PersistentStore {
     person.updatedAt = nowIso();
     person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares + (person.views || 0), lastUpdatedAt: person.updatedAt };
     await this.audit('person_share', undefined, { personId: person.id });
-    await this.persist();
+    this.schedulePersist();
     return clone(this.getPerson(person.id));
   }
 
@@ -900,7 +931,7 @@ export class PersistentStore {
     const person = this.state.people.find((item) => !item.archivedAt && (item.id === personId || item.slug === personId));
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
     const now = nowIso();
-    const day = now.slice(0, 10);
+    const day = calendarDay(new Date(now));
     const alreadyCounted = this.state.personViews.some((view) => view.personId === person.id && view.identityKey === identityKey && view.day === day);
     if (!alreadyCounted) {
       person.views = (person.views || 0) + 1;
@@ -915,7 +946,7 @@ export class PersistentStore {
         { personId: person.id, identityKey, day, createdAt: now },
       ];
       person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares + (person.views || 0), lastUpdatedAt: now };
-      await this.persist();
+      this.schedulePersist();
     }
     return clone(this.getPerson(person.id));
   }
@@ -1123,7 +1154,7 @@ export class PersistentStore {
         current.lastError = error instanceof Error ? error.message : 'The catalog import failed.';
       } finally {
         this.peopleAutomationBusy = false;
-        await this.persist();
+        await this.persist().catch((persistError) => console.error('Catalog automation state could not be saved:', persistError));
       }
     })();
 
@@ -1252,6 +1283,7 @@ export class PersistentStore {
     if (cleanName.length < 2) throw new StoreError('INVALID_NAME', 'Please enter a display name.');
     if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) throw new StoreError('INVALID_EMAIL', 'Please enter a valid email address.');
     if (password.length < 8) throw new StoreError('WEAK_PASSWORD', 'Password must be at least 8 characters.');
+    if (password.length > 256) throw new StoreError('WEAK_PASSWORD', 'Password must be 256 characters or fewer.');
     if (this.state.users.some((user) => user.email === cleanEmail)) {
       throw new StoreError('EMAIL_EXISTS', 'An account with this email already exists.', 409);
     }
@@ -1260,7 +1292,7 @@ export class PersistentStore {
       id: `user-${randomUUID()}`,
       name: cleanName,
       email: cleanEmail,
-      passwordHash: passwordHash(password),
+      passwordHash: await passwordHash(password),
       role: 'user',
       points: 0,
       walletBalancePkr: 0,
@@ -1274,8 +1306,9 @@ export class PersistentStore {
   }
 
   async login(email: string, password: string) {
+    if (password.length > 256) throw new StoreError('INVALID_LOGIN', 'Email or password is incorrect.', 401);
     const user = this.state.users.find((item) => item.email === email.trim().toLowerCase());
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (!user || !await verifyPassword(password, user.passwordHash)) {
       throw new StoreError('INVALID_LOGIN', 'Email or password is incorrect.', 401);
     }
     return { user: this.publicUser(user), token: await this.createSession(user.id) };
@@ -1470,6 +1503,10 @@ export class PersistentStore {
   }
 
   async backupNow() {
+    if (this.pendingPersistTimer) {
+      clearTimeout(this.pendingPersistTimer);
+      this.pendingPersistTimer = undefined;
+    }
     await this.persist();
     const name = `1v1vote-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     const target = path.join(this.backupDir, name);

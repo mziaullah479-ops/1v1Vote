@@ -1,4 +1,6 @@
 import { Buffer } from 'node:buffer';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
@@ -17,11 +19,28 @@ function decodeEntities(value: string) {
 }
 
 function blockedHost(hostname: string) {
-  const host = hostname.toLowerCase();
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') || host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return true;
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return true;
+  if (isIP(host) === 6) {
+    if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:') || host.startsWith('ff')) return true;
+    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+    return mapped ? blockedHost(mapped) : false;
+  }
   const parts = host.split('.').map(Number);
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
-  return parts[0] === 0 || parts[0] === 10 || parts[0] === 127 || (parts[0] === 169 && parts[1] === 254) || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168);
+  return parts[0] === 0 || parts[0] === 10 || parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127 || parts[0] === 127 || (parts[0] === 169 && parts[1] === 254) || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 0 && parts[2] === 0) || (parts[0] === 192 && parts[1] === 168) || (parts[0] === 198 && parts[1] === 18) || parts[0] >= 224;
+}
+
+async function assertPublicUrl(input: string) {
+  const url = new URL(input);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || blockedHost(url.hostname)) throw new ImageFetchError('Only public HTTP or HTTPS image URLs are supported.');
+  try {
+    const addresses = await lookup(url.hostname, { all: true, verbatim: true });
+    if (!addresses.length || addresses.some((entry) => blockedHost(entry.address))) throw new ImageFetchError('Only public HTTP or HTTPS image URLs are supported.');
+  } catch (error) {
+    if (error instanceof ImageFetchError) throw error;
+    throw new ImageFetchError('The image host could not be resolved.');
+  }
 }
 
 export function normalizeImageUrl(input: string) {
@@ -87,18 +106,42 @@ function pageImage(html: string, pageUrl: string) {
 
 function contentType(header: string, body: Buffer) {
   const type = header.split(';')[0].trim().toLowerCase();
+  if (type === 'image/svg+xml') return '';
   if (type.startsWith('image/')) return type;
   if (body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
   if (body.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) return 'image/jpeg';
   if (body.subarray(0, 6).toString() === 'GIF89a' || body.subarray(0, 6).toString() === 'GIF87a') return 'image/gif';
   if (body.subarray(0, 4).toString() === 'RIFF' && body.subarray(8, 12).toString() === 'WEBP') return 'image/webp';
-  if (/^\s*<svg[\s>]/i.test(body.subarray(0, 512).toString('utf8'))) return 'image/svg+xml';
+  if (/^\s*<svg[\s>]/i.test(body.subarray(0, 512).toString('utf8'))) return '';
   return '';
+}
+
+async function readLimitedBody(response: Response, limit: number) {
+  if (!response.body) return Buffer.from(await response.arrayBuffer());
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      total += result.value.byteLength;
+      if (total > limit) {
+        await reader.cancel();
+        throw new ImageFetchError('The remote image is too large.');
+      }
+      chunks.push(Buffer.from(result.value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }
 
 async function fetchImage(input: string, width: number, depth: number, visited: Set<string>): Promise<RemoteImage> {
   if (depth > 3) throw new ImageFetchError('The URL did not resolve to an image.');
   const normalized = normalizeImageUrl(input);
+  await assertPublicUrl(normalized);
   const parsed = new URL(normalized);
   const embedded = parsed.searchParams.get('imgurl') || parsed.searchParams.get('mediaurl');
   if (embedded) return fetchImage(embedded, width, depth + 1, visited);
@@ -108,7 +151,7 @@ async function fetchImage(input: string, width: number, depth: number, visited: 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(target, { signal: controller.signal, redirect: 'manual', headers: { Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,text/html;q=0.8,*/*;q=0.5', 'User-Agent': '1v1Vote image resolver/1.0' } });
+    const response = await fetch(target, { signal: controller.signal, redirect: 'manual', headers: { Accept: 'image/avif,image/webp,image/apng,image/*,text/html;q=0.8,*/*;q=0.5', 'User-Agent': '1v1Vote image resolver/1.0' } });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (!location) throw new ImageFetchError('The image redirect did not include a destination.');
@@ -119,7 +162,7 @@ async function fetchImage(input: string, width: number, depth: number, visited: 
     const declared = Number(response.headers.get('content-length') || 0);
     const limit = header.toLowerCase().includes('html') ? MAX_HTML_BYTES : MAX_BYTES;
     if (declared > limit) throw new ImageFetchError('The remote image is too large.');
-    const body = Buffer.from(await response.arrayBuffer());
+    const body = await readLimitedBody(response, limit);
     if (body.length > limit) throw new ImageFetchError('The remote image is too large.');
     const type = contentType(header, body);
     if (type) return { sourceUrl: normalized, contentType: type, body };
