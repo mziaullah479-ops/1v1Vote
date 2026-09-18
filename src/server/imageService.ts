@@ -44,7 +44,7 @@ function requestUrl(input: string, width: number) {
     const parts = url.pathname.split('/').filter(Boolean);
     if (parts[0] === 'wikipedia' && parts[1] === 'commons' && parts[2] === 'thumb' && parts.length >= 6) {
       const file = parts[parts.length - 1].replace(/^\d+px-/i, '');
-      url.pathname = '/wikipedia/commons/' + parts.slice(3, -1).join('/');
+      url.pathname = '/wikipedia/commons/' + parts.slice(3, -2).join('/');
       if (!url.pathname.endsWith('/')) url.pathname += '/';
       url.pathname += file;
     }

@@ -30,9 +30,10 @@ function errorResponse(res: express.Response, error: unknown) {
 function cookieOptions(maxAge: number) {
   const frontendOrigin = process.env.FRONTEND_ORIGIN?.split(',')[0]?.trim();
   const crossSiteFrontend = Boolean(frontendOrigin && frontendOrigin !== siteOrigin());
+  const sameSite: 'none' | 'lax' = process.env.NODE_ENV === 'production' && crossSiteFrontend ? 'none' : 'lax';
   return {
     httpOnly: true,
-    sameSite: (process.env.NODE_ENV === 'production' && crossSiteFrontend ? 'none' : 'lax') as const,
+    sameSite,
     secure: process.env.NODE_ENV === 'production',
     maxAge,
     path: '/',
@@ -174,7 +175,8 @@ async function startServer() {
     res.setHeader('X-DNS-Prefetch-Control', 'off');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; connect-src 'self' https:; font-src 'self' https: data:");
+    const connectSources = process.env.NODE_ENV === 'production' ? "'self' https:" : "'self' https: ws: wss:";
+    res.setHeader('Content-Security-Policy', `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; connect-src ${connectSources}; font-src 'self' https://fonts.gstatic.com data:`);
     if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     return next();
   });

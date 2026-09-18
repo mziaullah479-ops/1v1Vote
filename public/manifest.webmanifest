@@ -4,8 +4,8 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#070a13",
-  "theme_color": "#0ea5e9",
-  "description": "Vote for public figures, explore source-backed profiles, and see live rankings.",
+  "theme_color": "#0b2442",
+  "description": "1v1Vote is a source-backed public figure directory with daily voting and live rankings.",
   "icons": [
     {
       "src": "/icon-192.png",

@@ -11,7 +11,7 @@ declare global {
       adsenseClientId?: string;
       adsenseSlots?: Record<string, string | undefined>;
     };
-    dataLayer: unknown[][];
+    dataLayer: Array<Record<string, unknown> | unknown[]>;
     gtag: (...args: unknown[]) => void;
     adsbygoogle?: unknown[];
   }
