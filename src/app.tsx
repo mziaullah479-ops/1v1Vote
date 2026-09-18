@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
-import { PeopleDashboard } from './components/PeopleDashboard';
-import { AdminControlRoom } from './components/AdminControlRoom';
-import { PersonProfilePage } from './components/PersonProfilePage';
-import { SeoContentPage, SEO_PAGES } from './components/SeoContentPage';
+import { PeopleDashboard } from './components/peopledashboard';
+import { AdminControlRoom } from './components/admincontrolroom';
+import { PersonProfilePage } from './components/personprofilepage';
+import { SeoContentPage, SEO_PAGES } from './components/seocontentpage';
 import { setPageSeo } from './seo';
-import { SiteFooter } from './components/SiteFooter';
+import { SiteFooter } from './components/sitefooter';
 import { ThemeToggle } from './components/ThemeToggle';
-import { FounderPage } from './components/FounderPage';
+import { FounderPage } from './components/founderpage';
 
 export default function App() {
   const pathname = window.location.pathname.replace(/\/$/, '') || '/';
