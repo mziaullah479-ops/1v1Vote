@@ -5,8 +5,8 @@ import { promisify } from 'node:util';
 import { createClient, type Client } from '@libsql/client';
 import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
-import { MATCH_REQUEST_PLANS } from '../data/matchPricing';
-import { buildPersonMarket } from '../data/personMarket';
+import { MATCH_REQUEST_PLANS } from '../data/matchpricing';
+import { buildPersonMarket } from '../data/personmarket';
 import { resolveImageSourceUrl } from './imageService';
 
 type Role = 'user' | 'admin';
