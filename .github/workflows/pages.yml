@@ -30,43 +30,23 @@ jobs:
         run: VITE_BASE_PATH=/1v1Vote/ VITE_BACKEND_URL=https://1v1vote.com npm run build
       - name: Smoke-test backend bundle
         run: |
+          set -euxo pipefail
           export PORT=4175 NODE_ENV=production DATA_DIR="$RUNNER_TEMP/1v1vote-data" ADMIN_PASSWORD="ci-test-password"
-           node .server/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
+          node .server/server.cjs > "$RUNNER_TEMP/1v1vote-server.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-           for attempt in {1..20}; do
-             if curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
-               break
-             fi
-             sleep 1
-           done
-           if ! curl --fail --silent http://127.0.0.1:4175/api/health > /dev/null; then
-             node -e "console.log(require('fs').readFileSync(process.env.RUNNER_TEMP + '/1v1vote-server.log', 'utf8'))"
-             exit 1
-           fi
-          curl --fail --silent -c "$RUNNER_TEMP/user-cookies.txt" \
-            -H 'content-type: application/json' \
-            -d '{"name":"CI Tester","email":"ci@example.com","password":"ci-test-password"}' \
-            http://127.0.0.1:4175/api/auth/register > /dev/null
-          curl --fail --silent -b "$RUNNER_TEMP/user-cookies.txt" \
-            http://127.0.0.1:4175/api/matches > "$RUNNER_TEMP/matches.json"
-          match_id=$(node -p "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP + '/matches.json')).matches[0].id")
-          creator_id=$(node -p "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP + '/matches.json')).matches[0].creator1.id")
-          curl --fail --silent -b "$RUNNER_TEMP/user-cookies.txt" \
-            -H 'content-type: application/json' \
-            -d "{\"creatorId\":\"$creator_id\"}" \
-            "http://127.0.0.1:4175/api/matches/$match_id/vote" > /dev/null
-          duplicate_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-            -b "$RUNNER_TEMP/user-cookies.txt" \
-            -H 'content-type: application/json' \
-            -d "{\"creatorId\":\"$creator_id\"}" \
-            "http://127.0.0.1:4175/api/matches/$match_id/vote")
-          test "$duplicate_status" = "409"
-          curl --fail --silent -c "$RUNNER_TEMP/admin-cookies.txt" \
+          for attempt in {1..20}; do
+            if curl --fail --show-error --silent http://127.0.0.1:4175/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --show-error --silent http://127.0.0.1:4175/api/health > /dev/null
+          curl --fail --show-error --silent http://127.0.0.1:4175/api/people > /dev/null
+          curl --fail --show-error --silent http://127.0.0.1:4175/api/people/market > /dev/null
+          curl --fail --show-error --silent -c "$RUNNER_TEMP/admin-cookies.txt" \
             -H 'content-type: application/json' \
             -d '{"password":"ci-test-password"}' \
             http://127.0.0.1:4175/api/admin/login > /dev/null
-          curl --fail --silent -b "$RUNNER_TEMP/admin-cookies.txt" \
+          curl --fail --show-error --silent -b "$RUNNER_TEMP/admin-cookies.txt" \
             -X POST http://127.0.0.1:4175/api/admin/backup > /dev/null
           kill "$server_pid"
           wait "$server_pid" || true
