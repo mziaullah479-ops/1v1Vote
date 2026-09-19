@@ -151,6 +151,11 @@ function publicPerson(person: Person): Person {
   return profile;
 }
 
+function directoryPerson(person: Person): Omit<Person, 'bio' | 'profileUrl' | 'researchUrl'> {
+  const { bio: _bio, profileUrl: _profileUrl, researchUrl: _researchUrl, ...profile } = publicPerson(person);
+  return profile;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -441,7 +446,7 @@ export class PersistentStore {
   }
 
   getPeopleSnapshot() {
-    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map(publicPerson)).sort((left, right) => {
+    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map(directoryPerson)).sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;
       if (right.shares !== left.shares) return right.shares - left.shares;
       return left.name.localeCompare(right.name);
