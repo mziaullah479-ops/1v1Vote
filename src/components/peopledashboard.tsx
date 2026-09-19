@@ -120,6 +120,7 @@ export const PeopleDashboard: React.FC<PeopleDashboardProps> = ({ initialCategor
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<'All' | PersonCategory>(initialCategory);
   const [country, setCountry] = useState<'All' | PersonCountry>(initialCountry);
+  const [visibleLimit, setVisibleLimit] = useState(24);
   const [cooldowns, setCooldowns] = useState<Record<string, string>>(() => readCooldowns());
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -180,6 +181,10 @@ export const PeopleDashboard: React.FC<PeopleDashboardProps> = ({ initialCategor
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    setVisibleLimit(24);
+  }, [category, country, search]);
+
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(''), 3200);
@@ -236,6 +241,7 @@ export const PeopleDashboard: React.FC<PeopleDashboardProps> = ({ initialCategor
     const matchesSearch = !query || (rankQuery ? matchesRank : `${person.name} ${person.shortBio} ${person.bio || ''} ${person.category} ${person.country}`.toLowerCase().includes(query));
     return matchesSearch && (category === 'All' || person.category === category) && (country === 'All' || person.country === country);
   });
+  const displayedPeople = visiblePeople.slice(0, visibleLimit);
   return (
     <div className="people-dashboard min-h-screen bg-[#060a13] text-slate-100">
       {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-2xl border border-sky-400/50 bg-[#0c1a36] px-4 py-3 text-center text-xs font-bold text-sky-100 shadow-2xl">{toast}</div>}
@@ -279,9 +285,10 @@ export const PeopleDashboard: React.FC<PeopleDashboardProps> = ({ initialCategor
           {categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold transition ${category === item ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-slate-800 bg-[#0b1221] text-slate-500 hover:text-slate-300'}`}>{item}</button>)}
         </div>
 
-         <div className="mt-7 flex flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 sm:flex-row sm:items-center sm:justify-between"><span>{visiblePeople.length} profiles shown</span><span className="flex items-center gap-2">{liveError ? <><span className="text-amber-300">Showing the last known directory</span><button type="button" onClick={() => { setLoading(true); void loadPeople(); }} className="rounded-full border border-amber-400/30 px-2.5 py-1 text-[10px] font-black tracking-wider text-amber-200 transition hover:border-amber-300 hover:text-amber-100">Retry feed</button></> : lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Connecting to live feed'}</span></div>
+          <div className="mt-7 flex flex-col gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 sm:flex-row sm:items-center sm:justify-between"><span>{visiblePeople.length} profiles in directory</span><span className="flex items-center gap-2">{liveError ? <><span className="text-amber-300">Showing the last known directory</span><button type="button" onClick={() => { setLoading(true); void loadPeople(); }} className="rounded-full border border-amber-400/30 px-2.5 py-1 text-[10px] font-black tracking-wider text-amber-200 transition hover:border-amber-300 hover:text-amber-100">Retry feed</button></> : lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Connecting to live feed'}</span></div>
 
-        {loading ? <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-64 animate-pulse rounded-3xl border border-slate-800 bg-[#0b1221]" />)}</div> : visiblePeople.length ? <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visiblePeople.map((person) => <PersonCard key={person.id} person={person} rank={people.findIndex((item) => item.id === person.id) + 1} cooldown={cooldowns[person.id]} onVote={handleVote} onShare={handleShare} />)}</div> : <div className="mt-3 rounded-3xl border border-dashed border-slate-800 px-5 py-14 text-center text-sm text-slate-500">No profiles match this search or filter.</div>}
+        {loading ? <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-64 animate-pulse rounded-3xl border border-slate-800 bg-[#0b1221]" />)}</div> : visiblePeople.length ? <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{displayedPeople.map((person) => <PersonCard key={person.id} person={person} rank={people.findIndex((item) => item.id === person.id) + 1} cooldown={cooldowns[person.id]} onVote={handleVote} onShare={handleShare} />)}</div> : <div className="mt-3 rounded-3xl border border-dashed border-slate-800 px-5 py-14 text-center text-sm text-slate-500">No profiles match this search or filter.</div>}
+        {!loading && displayedPeople.length < visiblePeople.length && <div className="mt-6 flex flex-col items-center gap-2"><p className="text-xs text-slate-500">Showing {displayedPeople.length} of {visiblePeople.length} profiles</p><button type="button" onClick={() => setVisibleLimit((current) => current + 24)} className="rounded-xl border border-sky-400/50 bg-sky-400/10 px-5 py-3 text-xs font-black text-sky-200 transition hover:bg-sky-400/20">Show more profiles</button></div>}
 
          <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/80 bg-[#0b1221]/70 px-4 py-4 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-sky-400" /> No account required. Vote once for each profile per calendar day.</div><div className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Share any profile with its link.</div></div>
       </main>
