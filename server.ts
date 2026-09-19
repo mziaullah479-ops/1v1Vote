@@ -351,7 +351,6 @@ async function startServer() {
     return { user, identityKey: user ? `user:${user.id}` : getVisitorIdentity(req, res) };
   };
   let peoplePayloadCache: { expiresAt: number; body: string } | undefined;
-  let marketPayloadCache: { expiresAt: number; body: string } | undefined;
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: '1v1Vote', database: 'ready', timestamp: new Date().toISOString() });
@@ -384,25 +383,6 @@ async function startServer() {
     return res.type('application/json').send(peoplePayloadCache.body);
   });
 
-  app.get('/api/people/market', (_req, res) => {
-    if (!marketPayloadCache || marketPayloadCache.expiresAt <= Date.now()) {
-      const people = store.getPeopleSnapshot().map((person) => ({
-        id: person.id,
-        slug: person.slug,
-        name: person.name,
-        avatar: person.avatar,
-        category: person.category,
-        country: person.country,
-        market: person.market,
-      }));
-      marketPayloadCache = {
-        expiresAt: Date.now() + 5000,
-        body: JSON.stringify({ people, updatedAt: new Date().toISOString(), disclaimer: 'Public-signal model, not a financial price or an organic vote.' }),
-      };
-    }
-    return res.type('application/json').send(marketPayloadCache.body);
-  });
-
   app.get('/api/people/:personId', (req, res) => {
     const result = store.getPersonWithRank(req.params.personId);
     if (!result) return res.status(404).json({ error: 'Profile not found.' });
@@ -414,7 +394,6 @@ async function startServer() {
       const { identityKey } = getIdentity(req, res);
       const person = await store.voteForPerson(req.params.personId, identityKey);
       peoplePayloadCache = undefined;
-      marketPayloadCache = undefined;
       return res.json({ person, nextVoteAt: store.getNextPersonVoteAt() });
     } catch (error) {
       return errorResponse(res, error);
@@ -425,7 +404,6 @@ async function startServer() {
     try {
       const person = await store.sharePerson(req.params.personId);
       peoplePayloadCache = undefined;
-      marketPayloadCache = undefined;
       return res.json({ person });
     } catch (error) {
       return errorResponse(res, error);
