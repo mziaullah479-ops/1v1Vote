@@ -6,7 +6,7 @@ import { SeoContentPage, SEO_PAGES } from './components/seocontentpage';
 import { setPageSeo } from './seo';
 import { SiteFooter } from './components/sitefooter';
 import { ThemeToggle } from './components/ThemeToggle';
-import { FounderPage } from './components/founderpage';
+import { AboutMePage } from './components/founderpage';
 
 function NotFoundPage() {
   return <main className="flex min-h-screen items-center justify-center bg-[#060a13] px-5 py-16 text-center text-slate-100"><div className="max-w-lg"><p className="text-xs font-black uppercase tracking-[0.2em] text-sky-300">404 / page not found</p><h1 className="mt-4 text-4xl font-black text-white">That public page does not exist.</h1><p className="mt-4 text-sm leading-7 text-slate-400">Return to the live directory to browse source-backed profiles and current public rankings.</p><a href="/" className="mt-7 inline-flex rounded-xl bg-sky-300 px-5 py-3 text-sm font-black text-slate-950">Back to live rankings</a></div></main>;
@@ -49,7 +49,7 @@ export default function App() {
   }, [pathname, seoPage]);
   let content: React.ReactNode = pathname === '/' ? <PeopleDashboard /> : <NotFoundPage />;
   if (pathname === '/admin') content = <AdminControlRoom />;
-  else if (pathname === '/founder') content = <><FounderPage /><SiteFooter /></>;
+  else if (pathname === '/about-me') content = <><AboutMePage /><SiteFooter /></>;
   else if (directoryRoute && seoPage) content = <PeopleDashboard {...directoryRoute} pageTitle={seoPage.title} pageDescription={seoPage.description} />;
   else {
     const profileMatch = pathname.match(/^\/people\/([^/]+)$/);
