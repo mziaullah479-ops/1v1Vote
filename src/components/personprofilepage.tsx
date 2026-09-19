@@ -3,7 +3,6 @@ import { ArrowLeft, Check, ExternalLink, Share2, Vote } from 'lucide-react';
 import { Person } from '../types';
 import { setPageSeo, trackEvent } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
-import { PersonMarketDashboard } from './personmarketdashboard';
 import { apiUrl } from '../services/api';
 
 function formatCount(value: number) {
@@ -69,8 +68,7 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
            <div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Shares</div><div className="mt-1 text-2xl font-black text-white">{formatCount(person.shares)}</div></div>
          </div>
        </article>
-      <PersonMarketDashboard person={person} />
-      <section className="profile-about mt-6 rounded-3xl border border-slate-800 bg-[#0b1221] p-6"><h2 className="text-xl font-black text-white">About {person.name}</h2><p className="mt-3 text-sm leading-7 text-slate-300">{person.bio || person.shortBio}</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Category</div><div className="mt-1 text-sm font-bold text-white">{person.category}</div></div><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Country</div><div className="mt-1 text-sm font-bold text-white">{person.country}</div></div>{person.profileUrl && <a href={person.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-sky-300 hover:text-white">Open public source <ExternalLink className="h-4 w-4" /></a>}</div></section>
+       <section className="profile-about mt-6 rounded-3xl border border-slate-800 bg-[#0b1221] p-6"><h2 className="text-xl font-black text-white">About {person.name}</h2><p className="mt-3 text-sm leading-7 text-slate-300">{person.bio || person.shortBio}</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Category</div><div className="mt-1 text-sm font-bold text-white">{person.category}</div></div><div><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Country</div><div className="mt-1 text-sm font-bold text-white">{person.country}</div></div>{person.profileUrl && <a href={person.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-sky-300 hover:text-white">Open public source <ExternalLink className="h-4 w-4" /></a>}</div></section>
     </div>
   </main>;
 };

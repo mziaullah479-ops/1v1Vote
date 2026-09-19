@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, Check, ChevronUp, Clock3, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
+import { Check, ChevronUp, Clock3, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
 import { Person, PersonCategory, PersonCountry } from '../types';
 import { SiteFooter } from './sitefooter';
@@ -79,7 +79,6 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
           {isTopThree && <Trophy className="h-4 w-4" aria-label="Top ranked" />}
           #{rank}
         </div>
-        {person.market && <div className={`inline-flex max-w-[11rem] items-center gap-1 rounded-full border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider ${person.market.change24h >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/30 bg-rose-400/10 text-rose-200'}`}>{person.market.change24h >= 0 ? <ArrowUpRight className="h-3 w-3 shrink-0" /> : <ArrowDownRight className="h-3 w-3 shrink-0" />} {person.market.change24h >= 0 ? '+' : ''}{person.market.change24h.toFixed(1)}% <span className="hidden sm:inline">public signal</span></div>}
       </div>
 
       <div className="relative mt-5 flex flex-col items-center text-center">
