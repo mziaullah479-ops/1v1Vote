@@ -6,7 +6,6 @@ import { createClient, type Client } from '@libsql/client';
 import { Comment, Match, MatchRequest, Person, PersonCategory, PersonCountry, UserProfile } from '../types';
 import { INITIAL_COMMENTS, INITIAL_MATCHES, INITIAL_PEOPLE } from '../data/seedData';
 import { MATCH_REQUEST_PLANS } from '../data/matchpricing';
-import { buildPersonMarket } from '../data/personmarket';
 import { resolveImageSourceUrl } from './imageService';
 
 type Role = 'user' | 'admin';
@@ -146,6 +145,12 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function publicPerson(person: Person): Person {
+  const profile = { ...person } as Person & { market?: unknown };
+  delete profile.market;
+  return profile;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -279,7 +284,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
     people: mergedPeople.map((person) => {
       const seed = seeded.people.find((item) => item.slug === person.slug);
       const useSeedIdentity = Boolean(seed && isPlaceholderAvatar(person.avatar));
-      const { supportCredits: _supportCredits, promotion: _promotion, views: _views, viewHistory: _viewHistory, socialGrowth24h: _socialGrowth24h, socialLastCheckedAt: _socialLastCheckedAt, lastResearchedAt: _lastResearchedAt, ...storedPerson } = person as Person & Record<string, unknown>;
+       const { supportCredits: _supportCredits, promotion: _promotion, views: _views, viewHistory: _viewHistory, socialGrowth24h: _socialGrowth24h, socialLastCheckedAt: _socialLastCheckedAt, lastResearchedAt: _lastResearchedAt, market: _market, ...storedPerson } = person as Person & Record<string, unknown>;
       const normalized: Person = {
         ...storedPerson,
         name: canonicalNames.get(person.id) || person.name,
@@ -292,8 +297,7 @@ function normalizeState(input: Partial<DatabaseState>): DatabaseState {
         shares: resetPeopleActivity ? 0 : person.shares || 0,
         updatedAt: person.updatedAt || nowIso(),
       };
-       normalized.market = buildPersonMarket(normalized);
-      return normalized;
+       return normalized;
     }),
     comments: input.comments && typeof input.comments === 'object' ? input.comments : seeded.comments,
     users: Array.isArray(input.users) ? input.users : [],
@@ -437,10 +441,7 @@ export class PersistentStore {
   }
 
   getPeopleSnapshot() {
-    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map((person) => ({
-      ...person,
-      market: person.market ? { ...person.market, history: { '1D': [], '1W': [], '1M': [], '1Y': [], '5Y': [] } } : undefined,
-    }))).sort((left, right) => {
+    return clone(this.state.people.filter((person) => !person.archivedAt && Boolean(person.avatar)).map(publicPerson)).sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;
       if (right.shares !== left.shares) return right.shares - left.shares;
       return left.name.localeCompare(right.name);
@@ -459,14 +460,11 @@ export class PersistentStore {
       .filter((item) => !item.archivedAt && Boolean(item.avatar))
       .sort((left, right) => right.votes - left.votes || right.shares - left.shares || left.name.localeCompare(right.name))
       .findIndex((item) => item.id === person.id) + 1;
-    return { person, rank };
+    return { person: publicPerson(person), rank };
   }
 
   getAdminPeopleSnapshot() {
-    return clone(this.state.people.map((person) => ({
-      ...person,
-      market: person.market ? { ...person.market, history: { '1D': [], '1W': [], '1M': [], '1Y': [], '5Y': [] } } : undefined,
-    }))).sort((left, right) => {
+    return clone(this.state.people.map(publicPerson)).sort((left, right) => {
       if (Boolean(left.archivedAt) !== Boolean(right.archivedAt)) return left.archivedAt ? 1 : -1;
       return left.name.localeCompare(right.name);
     });
@@ -512,13 +510,11 @@ export class PersistentStore {
       shares: existing?.shares || 0,
       updatedAt: now,
       archivedAt: existing?.archivedAt,
-      market: existing?.market,
     };
   }
 
   async createPerson(input: Partial<Person>, actorId = 'admin') {
     const person = await this.personInput(input);
-    person.market = person.market || buildPersonMarket(person);
     if (this.state.people.some((item) => item.slug === person.slug || item.name.toLowerCase() === person.name.toLowerCase())) {
       throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
     }
@@ -536,7 +532,6 @@ export class PersistentStore {
       throw new StoreError('PERSON_EXISTS', 'A profile with this name already exists.', 409);
     }
     Object.assign(person, updated);
-    person.market = buildPersonMarket(person);
     await this.audit('person.updated', actorId, { personId: person.id });
     await this.persist();
     return clone(person);
@@ -578,14 +573,13 @@ export class PersistentStore {
     const now = nowIso();
     person.votes += 1;
     person.updatedAt = now;
-    person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares, lastUpdatedAt: now };
     this.state.personVotes = [
       ...this.state.personVotes.filter((vote) => new Date(vote.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000),
       { personId: person.id, identityKey, createdAt: now },
     ];
     await this.audit('person_vote', undefined, { personId: person.id });
     await this.persist();
-    return clone(this.getPerson(person.id));
+    return publicPerson(clone(person));
   }
 
   getNextPersonVoteAt() {
@@ -597,10 +591,9 @@ export class PersistentStore {
     if (!person) throw new StoreError('PERSON_NOT_FOUND', 'That profile is not available.', 404);
     person.shares += 1;
     person.updatedAt = nowIso();
-    person.market = { ...buildPersonMarket(person), communityVotes: person.votes, activity24h: person.votes + person.shares, lastUpdatedAt: person.updatedAt };
     await this.audit('person_share', undefined, { personId: person.id });
     this.schedulePersist();
-    return clone(this.getPerson(person.id));
+    return publicPerson(clone(person));
   }
 
   getAudit(limit = 100) {
