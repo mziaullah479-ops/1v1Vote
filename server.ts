@@ -135,9 +135,23 @@ function replaceMeta(html: string, attribute: 'name' | 'property', key: string, 
   return html.replace(pattern, (_match, prefix: string, suffix: string) => `${prefix}${escapeHtml(content)}${suffix}`);
 }
 
-function applyServerSeo(html: string, pathname: string, match?: import('./src/types').Match, person?: import('./src/types').Person) {
+const PUBLIC_CONTENT_PATHS = new Set([
+  '/', '/request', '/about', '/how-it-works', '/rankings', '/people', '/vote', '/discover', '/profiles', '/sources',
+  '/editorial-policy', '/data-safety', '/privacy', '/terms', '/faq', '/contact', '/founder', '/pakistan', '/india', '/usa', '/global',
+  '/politics', '/religious-scholars', '/sports', '/entertainment', '/business', '/public-figures', '/leaders', '/scholars', '/athletes',
+  '/actors', '/entrepreneurs', '/pakistani-leaders', '/pakistani-scholars', '/international-stars', '/vote-guide', '/categories',
+  '/country-rankings', '/daily-vote', '/profile-corrections', '/site-map', '/admin',
+]);
+
+function normalizePathname(pathname: string) {
+  const normalized = pathname.replace(/\/+/g, '/').replace(/\/$/, '');
+  return normalized || '/';
+}
+
+function applyServerSeo(html: string, pathname: string, match?: import('./src/types').Match, person?: import('./src/types').Person, noIndex = false) {
   const origin = siteOrigin();
-  const url = `${origin}${pathname === '/' ? '/' : pathname}`;
+  const normalizedPath = normalizePathname(pathname);
+  const url = `${origin}${normalizedPath === '/' ? '/' : normalizedPath}`;
   const staticTitles: Record<string, string> = {
     '/about': 'About 1v1Vote', '/how-it-works': 'How 1v1Vote Works', '/rankings': 'Live Public Figure Rankings', '/people': 'Important People Directory',
     '/vote': 'Vote for Public Figures', '/discover': 'Discover Public Figures', '/profiles': 'Public Figure Profiles', '/sources': 'Profile Sources',
@@ -148,7 +162,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/public-figures': 'Public Figures Directory', '/leaders': 'Leaders and Public Voices', '/scholars': 'Scholars Directory', '/athletes': 'Athletes Directory',
     '/actors': 'Actors and Entertainers', '/entrepreneurs': 'Entrepreneurs Directory', '/pakistani-leaders': 'Pakistani Leaders', '/pakistani-scholars': 'Pakistani Scholars',
     '/international-stars': 'International Public Figures', '/vote-guide': '1v1Vote Voting Guide',
-     '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map', '/founder': 'Founder & Project Steward',
+     '/categories': 'Public Figure Categories', '/country-rankings': 'Country Rankings', '/daily-vote': 'Daily Vote', '/profile-corrections': 'Profile Corrections', '/site-map': '1v1Vote Site Map', '/founder': 'Muhammad Ziaullah - Founder of 1v1Vote',
   };
   const titleOverrides: Record<string, string> = {
     '/about': 'About 1v1Vote - Public Opinion Rankings',
@@ -159,7 +173,7 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/vote': 'Vote for Public Figures | 1v1Vote',
     '/vote-guide': '1v1Vote Voting Guide',
      '/site-map': '1v1Vote Site Map',
-     '/founder': 'Founder & Project Steward - 1v1Vote',
+     '/founder': 'Muhammad Ziaullah - Founder of 1v1Vote',
   };
   const descriptionOverrides: Record<string, string> = {
     '/about': 'Learn how 1v1Vote ranks public figures through transparent daily voting.',
@@ -170,26 +184,26 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
     '/vote': 'Support public figures you follow and help shape the live 1v1Vote ranking. Vote once per calendar day with no account required.',
     '/vote-guide': 'A clear guide to voting, cooldowns, rankings, and profile pages.',
      '/site-map': 'Browse the public pages and directories available on 1v1Vote.',
-     '/founder': 'Learn why 1v1Vote was built and how its independent founder approaches public profiles, daily voting, and editorial responsibility.',
+      '/founder': 'Meet Muhammad Ziaullah, an independent developer and entrepreneur building practical, user-first digital products including 1v1Vote.',
   };
   const title = person
     ? `${person.name} Vote Ranking - 1v1Vote`
     : match
     ? `${match.creator1.name} vs ${match.creator2.name} - 1v1Vote Live Arena`
-    : titleOverrides[pathname]
-      ? titleOverrides[pathname]
-      : staticTitles[pathname]
-        ? `${staticTitles[pathname]} - 1v1Vote`
-        : pathname.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Live Public Figure Rankings & Daily Voting';
+     : titleOverrides[normalizedPath]
+       ? titleOverrides[normalizedPath]
+       : staticTitles[normalizedPath]
+          ? `${staticTitles[normalizedPath]} - 1v1Vote`
+         : normalizedPath.startsWith('/admin') ? 'Secure Profile Admin - 1v1Vote' : '1v1Vote - Live Public Figure Rankings & Daily Voting';
   const description = person
     ? `Read about ${person.name}, view the source profile, and vote in the live 1v1Vote ranking.`
     : match
     ? `Vote in the live 1v1 battle between ${match.creator1.name} and ${match.creator2.name}. Share the result and follow the live vote swing.`
-    : descriptionOverrides[pathname]
-      ? descriptionOverrides[pathname]
-      : staticTitles[pathname]
-        ? `Explore ${staticTitles[pathname].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
-      : 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once per calendar day.';
+     : descriptionOverrides[normalizedPath]
+       ? descriptionOverrides[normalizedPath]
+       : staticTitles[normalizedPath]
+         ? `Explore ${staticTitles[normalizedPath].toLowerCase()}, source-backed profiles, and live public voting on 1v1Vote.`
+       : 'Vote for public figures, explore source-backed profiles, and see live rankings across Pakistan, India, the USA, and the world. Vote once per calendar day.';
 
   let result = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   result = replaceMeta(result, 'name', 'description', description);
@@ -198,16 +212,28 @@ function applyServerSeo(html: string, pathname: string, match?: import('./src/ty
   result = replaceMeta(result, 'property', 'og:url', url);
   result = replaceMeta(result, 'name', 'twitter:title', title);
   result = replaceMeta(result, 'name', 'twitter:description', description);
+  if (noIndex || normalizedPath.startsWith('/admin')) result = replaceMeta(result, 'name', 'robots', 'noindex,nofollow,noarchive');
   if (person) {
     result = replaceMeta(result, 'property', 'og:image', person.avatar);
     result = replaceMeta(result, 'name', 'twitter:image', person.avatar);
     const jsonLd = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Person', name: person.name, description: person.bio || person.shortBio, image: person.avatar, url }).replace(/</g, '\\u003c');
     result = result.replace('</head>', `<script type="application/ld+json">${jsonLd}</script></head>`);
   }
+  if (normalizedPath === '/founder') {
+    const founderImage = `${origin}/muhammad-ziaullah.png`;
+    result = replaceMeta(result, 'property', 'og:image', founderImage);
+    result = replaceMeta(result, 'property', 'og:image:type', 'image/png');
+    result = replaceMeta(result, 'property', 'og:image:alt', 'Muhammad Ziaullah, founder of 1v1Vote');
+    result = replaceMeta(result, 'name', 'twitter:image', founderImage);
+    const jsonLd = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Person', name: 'Muhammad Ziaullah', jobTitle: 'Independent developer and entrepreneur', description, image: founderImage, url }).replace(/</g, '\\u003c');
+    result = result.replace('</head>', `<script type="application/ld+json">${jsonLd}</script></head>`);
+  }
   result = result.replace(/<link rel=\"canonical\" href=\"[^\"]*\"\s*\/>/i, `<link rel=\"canonical\" href=\"${escapeHtml(url)}\" />`);
   const fallback = person
     ? `<main style="max-width:760px;margin:0 auto;padding:48px 20px;font-family:system-ui,sans-serif;color:#e2e8f0;background:#060a13;min-height:100vh"><a href="/" style="color:#7dd3fc">Back to live rankings</a><article style="margin-top:32px"><p style="color:#7dd3fc;text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:700">Ranked public profile</p><h1 style="font-size:42px;line-height:1.1;color:#fff">${escapeHtml(person.name)} Vote Ranking</h1><p style="font-size:18px;line-height:1.7">${escapeHtml(person.shortBio)}</p><p style="line-height:1.8">${escapeHtml(person.bio || person.shortBio)}</p><p><strong>Category:</strong> ${escapeHtml(person.category)} &nbsp; <strong>Country:</strong> ${escapeHtml(person.country)}</p><p><a href="${escapeHtml(person.profileUrl || `${origin}/people/${person.slug}`)}" style="color:#7dd3fc">Open public source</a></p><p>Vote for ${escapeHtml(person.name)} on 1v1Vote. Votes are recorded once per profile per calendar day.</p></article></main>`
-    : `<main style="max-width:760px;margin:0 auto;padding:48px 20px;font-family:system-ui,sans-serif;color:#e2e8f0;background:#060a13;min-height:100vh"><a href="/" style="color:#7dd3fc">Back to live rankings</a><h1 style="font-size:40px;color:#fff">${escapeHtml(title)}</h1><p style="font-size:18px;line-height:1.7">${escapeHtml(description)}</p><p>Explore source-backed public profiles, transparent daily voting, and live rankings on 1v1Vote.</p><p><a href="/people" style="color:#7dd3fc">Browse the public directory</a></p></main>`;
+     : normalizedPath === '/founder'
+       ? `<main style="max-width:760px;margin:0 auto;padding:48px 20px;font-family:system-ui,sans-serif;color:#e2e8f0;background:#060a13;min-height:100vh"><a href="/" style="color:#7dd3fc">Back to live rankings</a><article style="margin-top:32px"><img src="${escapeHtml(`${origin}/muhammad-ziaullah.png`)}" alt="Muhammad Ziaullah" width="180" height="220" style="width:180px;height:220px;object-fit:cover;border-radius:24px"><h1 style="font-size:42px;line-height:1.1;color:#fff">Muhammad Ziaullah</h1><p style="font-size:18px;line-height:1.7">Independent developer, entrepreneur, and product builder.</p><p style="line-height:1.8">I build practical, user-first web and mobile platforms, from public engagement tools like 1v1Vote to automation systems and niche community apps.</p><p style="line-height:1.8">My focus is solving real problems, keeping products lightweight, and growing them sustainably.</p></article></main>`
+       : `<main style="max-width:760px;margin:0 auto;padding:48px 20px;font-family:system-ui,sans-serif;color:#e2e8f0;background:#060a13;min-height:100vh"><a href="/" style="color:#7dd3fc">Back to live rankings</a><h1 style="font-size:40px;color:#fff">${escapeHtml(title)}</h1><p style="font-size:18px;line-height:1.7">${escapeHtml(description)}</p><p>Explore source-backed public profiles, transparent daily voting, and live rankings on 1v1Vote.</p><p><a href="/people" style="color:#7dd3fc">Browse the public directory</a></p></main>`;
   result = result.replace('<div id="root"></div>', `<div id="root">${fallback}</div>`);
   return result;
 }
@@ -762,7 +788,7 @@ async function startServer() {
         adsenseClientId: undefined,
         adsenseSlots: {},
       });
-      const requestedPath = req.path || '/';
+       const requestedPath = normalizePathname(req.path || '/');
        let match: import('./src/types').Match | undefined;
        let person: import('./src/types').Person | undefined;
        if (requestedPath.startsWith('/vs/')) {
@@ -779,9 +805,14 @@ async function startServer() {
            person = undefined;
          }
        }
-       const html = applyServerSeo(indexHtml, requestedPath, match, person)
-        .replace('</head>', `<script>window.__RUNTIME_CONFIG__=${runtimeConfig};</script></head>`);
-      return res.type('html').send(html);
+       const isProfilePath = /^\/people\/[^/]+$/.test(requestedPath);
+       const isMatchPath = /^\/vs\/[^/]+$/.test(requestedPath);
+       const knownPath = PUBLIC_CONTENT_PATHS.has(requestedPath) || isProfilePath || isMatchPath;
+       const missingResource = (isProfilePath && !person) || (isMatchPath && !match);
+       const html = applyServerSeo(indexHtml, requestedPath, match, person, !knownPath || missingResource)
+         .replace('</head>', `<script>window.__RUNTIME_CONFIG__=${runtimeConfig};</script></head>`);
+       res.setHeader('Cache-Control', 'no-store');
+       return res.status(!knownPath || missingResource ? 404 : 200).type('html').send(html);
     });
   }
 
