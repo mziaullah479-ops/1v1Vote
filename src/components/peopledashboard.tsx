@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronUp, Clock3, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
+import { Check, Clock3, Link2, Radio, Search, Share2, Sparkles, Trophy, Users, Vote } from 'lucide-react';
 import { INITIAL_PEOPLE } from '../data/seedData';
 import { Person, PersonCategory, PersonCountry } from '../types';
 import { SiteFooter } from './sitefooter';
@@ -72,32 +72,31 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
   const isCoolingDown = Boolean(cooldown && new Date(cooldown).getTime() > Date.now());
   const isTopThree = rank <= 3;
   return (
-    <article id={`person-${person.slug}`} data-testid={`card-person-${person.id}`} className={`person-card group relative overflow-hidden rounded-3xl border p-4 shadow-2xl transition duration-300 hover:-translate-y-1 sm:p-5 ${isTopThree ? 'border-sky-500/35' : 'border-slate-800/90'}`}>
-      <div className="absolute -right-16 -top-16 h-36 w-36 rounded-full bg-sky-500/10 blur-3xl transition group-hover:bg-sky-400/20" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className={`rank-chip inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-black ${rank === 1 ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : rank === 2 ? 'border-slate-300/50 bg-slate-300/10 text-slate-200' : rank === 3 ? 'border-orange-400/50 bg-orange-400/10 text-orange-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
-          {isTopThree && <Trophy className="h-4 w-4" aria-label="Top ranked" />}
-          #{rank}
+    <article id={`person-${person.slug}`} data-testid={`card-person-${person.id}`} className={`person-card group relative overflow-hidden rounded-[1.75rem] border bg-[#0b1221] p-4 shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-5 ${isTopThree ? 'border-sky-400/45' : 'border-slate-800/90'}`}>
+      <div className={`absolute inset-x-0 top-0 h-1 ${rank === 1 ? 'bg-amber-400' : rank === 2 ? 'bg-slate-300' : rank === 3 ? 'bg-orange-400' : 'bg-sky-400/50'}`} />
+      <div className="relative flex items-center justify-between gap-3 pt-1">
+        <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] ${rank === 1 ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : rank === 2 ? 'border-slate-300/50 bg-slate-300/10 text-slate-200' : rank === 3 ? 'border-orange-400/50 bg-orange-400/10 text-orange-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
+          {isTopThree && <Trophy className="h-3.5 w-3.5" aria-label="Top ranked" />}
+          Rank #{rank}
         </div>
+        {person.verified && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-500"><Check className="h-3.5 w-3.5" /> Verified</span>}
       </div>
 
-      <div className="relative mt-5 flex flex-col items-center text-center">
-        <div className="relative h-24 w-24 overflow-hidden rounded-full border-2 border-sky-400 bg-slate-900 shadow-lg shadow-sky-900/10 sm:h-28 sm:w-28">
+      <div className="relative mt-5 flex items-center gap-4">
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-sky-400 bg-slate-900 shadow-lg shadow-sky-900/10 sm:h-24 sm:w-24">
           {!imageError && <img src={imageVariant(person.avatar, 240)} alt={person.name} width={112} height={112} loading="lazy" decoding="async" sizes="112px" className="relative z-10 h-full w-full object-cover" onError={() => setImageError(true)} />}
           <span className="absolute inset-0 flex items-center justify-center text-lg font-black text-sky-300">{personInitials(person.name)}</span>
         </div>
-        <a href={`/people/${encodeURIComponent(person.slug)}`} className="mt-3 block max-w-full truncate text-lg font-black text-white hover:text-sky-300">{person.name}</a>
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-          <span className="text-sky-300">{person.category}</span>
-          <span>•</span>
-          <span>{person.country}</span>
-          {person.verified && <Check className="h-3.5 w-3.5 text-emerald-400" aria-label="Verified profile" />}
+        <div className="min-w-0 text-left">
+          <a href={`/people/${encodeURIComponent(person.slug)}`} className="block text-base font-black leading-tight text-white hover:text-sky-300 sm:text-lg">{person.name}</a>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500"><span className="text-sky-300">{person.category}</span><span>•</span><span>{person.country}</span></div>
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{person.shortBio}</p>
         </div>
       </div>
 
-      <div className="relative mt-5 flex items-center justify-between gap-3 border-t border-slate-800/80 pt-4">
-         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-400/10"><ChevronUp className="h-4 w-4 text-emerald-400" /></div>
+      <div className="relative mt-5 flex items-end justify-between gap-3 border-t border-slate-800/80 pt-4">
+         <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-400/10"><Users className="h-4 w-4 text-sky-400" /></div>
           <div className="min-w-0"><div className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">Organic votes</div><div className="mt-0.5 text-2xl font-black tracking-tight text-white">{formatCount(person.votes)}</div></div>
         </div>
         <div className="flex shrink-0 items-center gap-2">

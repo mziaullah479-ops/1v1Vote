@@ -26,7 +26,7 @@ const footerGroups = [
   {
     title: 'Help & policies',
     links: [
-       ['/faq', 'FAQ'], ['/vote-guide', 'Voting guide'], ['/founder', 'Founder'], ['/request', 'Profile request'], ['/profile-corrections', 'Profile corrections'], ['/contact', 'Contact'],
+        ['/faq', 'FAQ'], ['/vote-guide', 'Voting guide'], ['/about-me', 'About me'], ['/request', 'Profile request'], ['/profile-corrections', 'Profile corrections'], ['/contact', 'Contact'],
       ['/editorial-policy', 'Editorial policy'], ['/data-safety', 'Data safety'], ['/privacy', 'Privacy'], ['/terms', 'Terms'], ['/site-map', 'Site map'],
     ],
   },
