@@ -58,6 +58,15 @@ interface PersonCardProps {
   onShare: (person: Person) => void;
 }
 
+interface PeopleDashboardProps {
+  initialCategory?: 'All' | PersonCategory;
+  initialCountry?: 'All' | PersonCountry;
+  heading?: string;
+  intro?: string;
+  pageTitle?: string;
+  pageDescription?: string;
+}
+
 const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote, onShare }) => {
   const [imageError, setImageError] = useState(false);
   const isCoolingDown = Boolean(cooldown && new Date(cooldown).getTime() > Date.now());
@@ -106,16 +115,20 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, rank, cooldown, onVote,
   );
 };
 
-export const PeopleDashboard: React.FC = () => {
+export const PeopleDashboard: React.FC<PeopleDashboardProps> = ({ initialCategory = 'All', initialCountry = 'All', heading, intro, pageTitle, pageDescription }) => {
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<'All' | PersonCategory>('All');
-  const [country, setCountry] = useState<'All' | PersonCountry>('All');
+  const [category, setCategory] = useState<'All' | PersonCategory>(initialCategory);
+  const [country, setCountry] = useState<'All' | PersonCountry>(initialCountry);
   const [cooldowns, setCooldowns] = useState<Record<string, string>>(() => readCooldowns());
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [liveError, setLiveError] = useState(false);
+
+  useEffect(() => {
+    if (pageTitle && pageDescription) setPageSeo(pageTitle, pageDescription, window.location.pathname.replace(/\/$/, '') || '/');
+  }, [pageDescription, pageTitle]);
 
   const loadPeople = async (signal?: AbortSignal) => {
     try {
@@ -201,16 +214,15 @@ export const PeopleDashboard: React.FC = () => {
 
   const handleShare = async (person: Person) => {
     const shareUrl = `${window.location.origin}/people/${encodeURIComponent(person.slug)}`;
-    void fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/share`), { method: 'POST', credentials: 'include' }).catch(() => undefined);
     try {
       if (navigator.share) {
-        trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
         await navigator.share({ title: `${person.name} on 1v1Vote`, text: `Vote for ${person.name} on 1v1Vote.`, url: shareUrl });
       } else {
         await navigator.clipboard.writeText(shareUrl);
-        trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
         showToast('Profile link copied.');
       }
+      void fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/share`), { method: 'POST', credentials: 'include' }).catch(() => undefined);
+      trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
     } catch {
       // The share sheet can be dismissed without an error message.
     }
@@ -246,8 +258,8 @@ export const PeopleDashboard: React.FC = () => {
           <div className="relative">
             <div className="max-w-3xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-sky-300"><Sparkles className="h-3.5 w-3.5" /> Live index</div>
-              <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">Who is the public backing?</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">One vote per profile, every day. Browse source-backed people from Pakistan, India, the USA, and beyond, then watch the ranking move.</p>
+              <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">{heading || 'Who is the public backing?'}</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">{intro || 'One vote per profile, every day. Browse source-backed people from Pakistan, India, the USA, and beyond, then watch the ranking move.'}</p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <a href="#directory" className="inline-flex min-h-10 items-center rounded-xl bg-sky-400 px-4 text-xs font-black text-slate-950 transition hover:bg-sky-300">Browse the index</a>
                 <a href="/how-it-works" className="inline-flex min-h-10 items-center rounded-xl border border-slate-700 bg-slate-950/20 px-4 text-xs font-black text-slate-200 transition hover:border-sky-400/60 hover:text-sky-200">See how voting works</a>

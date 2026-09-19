@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, Share2, Vote } from 'lucide-react';
 import { Person } from '../types';
-import { setPageSeo } from '../seo';
+import { setPageSeo, trackEvent } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
 import { PersonMarketDashboard } from './personmarketdashboard';
 import { apiUrl } from '../services/api';
@@ -31,17 +31,21 @@ export const PersonProfilePage: React.FC<{ slug: string }> = ({ slug }) => {
   const vote = async () => {
     if (!person) return;
      const response = await fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/vote`), { method: 'POST', credentials: 'include' });
-    const payload = await response.json() as { person?: Person; error?: string };
-    setMessage(response.ok ? `Vote registered for ${person.name}. You can vote again after midnight.` : payload.error || 'Vote could not be registered.');
-    if (payload.person) setPerson(payload.person);
+     const payload = await response.json() as { person?: Person; error?: string };
+     setMessage(response.ok ? `Vote registered for ${person.name}. You can vote again after midnight.` : payload.error || 'Vote could not be registered.');
+     if (payload.person) {
+       setPerson(payload.person);
+       trackEvent('vote_submitted', { profile_category: person.category, profile_country: person.country });
+     }
   };
 
   const share = async () => {
     if (!person) return;
     const url = `${window.location.origin}/people/${person.slug}`;
-     void fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/share`), { method: 'POST', credentials: 'include' });
-    if (navigator.share) await navigator.share({ title: `${person.name} on 1v1Vote`, text: `Vote for ${person.name} on 1v1Vote.`, url });
-    else await navigator.clipboard.writeText(url);
+     if (navigator.share) await navigator.share({ title: `${person.name} on 1v1Vote`, text: `Vote for ${person.name} on 1v1Vote.`, url });
+     else await navigator.clipboard.writeText(url);
+     void fetch(apiUrl(`/api/people/${encodeURIComponent(person.id)}/share`), { method: 'POST', credentials: 'include' }).catch(() => undefined);
+     trackEvent('profile_shared', { profile_category: person.category, profile_country: person.country });
   };
 
   if (!person) return <main className="flex min-h-screen items-center justify-center bg-[#060a13] px-4 text-center text-sm text-slate-400">{message}</main>;
