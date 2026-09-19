@@ -3,7 +3,7 @@ import { ArrowDownRight, ArrowUpRight, Check, ChevronUp, Clock3, Link2, Radio, S
 import { INITIAL_PEOPLE } from '../data/seedData';
 import { Person, PersonCategory, PersonCountry } from '../types';
 import { SiteFooter } from './sitefooter';
-import { trackEvent } from '../seo';
+import { setPageSeo, trackEvent } from '../seo';
 import { imageVariant } from '../utils/imageUrl';
 import { apiUrl } from '../services/api';
 
